@@ -11,7 +11,7 @@ use tokio::{
 async fn main() {
     // build our application with a single route
     let app = Router::new()
-        .route("/", get(|| async { "Test" }));
+        .route("/health", get(|| async { "Hello, I am running." }));
 
     // run our app with hyper, listening globally on port 3000
     let listener = TcpListener::bind("localhost:2727").await.unwrap();
