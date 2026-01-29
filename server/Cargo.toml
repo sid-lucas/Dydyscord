@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+axum = "0.8.8" # web framework
+tokio = { version = "1.49.0", features = ["full"] } # runtime asynchrone
+tower = "0.5.3" # middleware Axum
