@@ -1,8 +1,6 @@
 use clap::{Parser, Subcommand};
 use reqwest;
 
-mod crypto;
-
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

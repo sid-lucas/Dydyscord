@@ -5,7 +5,5 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.5.55", features = ["derive"] }
-ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
-ml-dsa = "0.0.4"
-rand_core = "0.6"
+openmls = "0.7.1"
 reqwest = { version = "0.13.1", features = ["blocking"] }
