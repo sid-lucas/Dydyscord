@@ -1,49 +1,83 @@
-use clap::{Parser, Subcommand};
-use reqwest;
+use inquire::{InquireError, Select, Text};
+use inquire_derive::Selectable;
+use openmls::prelude::{tls_codec::*, *};
+use openmls_basic_credential::SignatureKeyPair;
+use openmls_rust_crypto::OpenMlsRustCrypto;
+use std::fmt;
 
-/// Simple program to greet a person
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Cli {
-    /// Arguments globaux (pour toutes les commandes)
-    #[arg(short, long)]
-    verbose: bool,
+// A helper to create and store credentials.
+fn generate_credential_with_key(
+    identity: Vec<u8>,
+    credential_type: CredentialType,
+    signature_algorithm: SignatureScheme,
+    provider: &impl OpenMlsProvider,
+) -> (CredentialWithKey, SignatureKeyPair) {
+    let credential = BasicCredential::new(identity);
+    let signature_keys =
+        SignatureKeyPair::new(signature_algorithm).expect("Error generating a signature key pair.");
 
-    // Subcommands dispo (Commands)
-    #[command(subcommand)]
-    command: Commands,
+    // Store the signature key into the key store so OpenMLS has access
+    // to it.
+    signature_keys
+        .store(provider.storage())
+        .expect("Error storing signature keys in key store.");
+
+    (
+        CredentialWithKey {
+            credential: credential.into(),
+            signature_key: signature_keys.public().into(),
+        },
+        signature_keys,
+    )
 }
 
-#[derive(Subcommand, Debug)]
-enum Commands {
-    Connect {
-        #[arg(short, long, default_value = "127.0.0.1")]
-        ip: String,
-
-        #[arg(short, long, default_value = "2727")]
-        port: u16,
-    }
+// A helper to create key package bundles.
+fn generate_key_package(
+    ciphersuite: Ciphersuite,
+    provider: &impl OpenMlsProvider,
+    signer: &SignatureKeyPair,
+    credential_with_key: CredentialWithKey,
+) -> KeyPackageBundle {
+    // Create the key package
+    KeyPackage::builder()
+        .build(ciphersuite, provider, signer, credential_with_key)
+        .unwrap()
 }
 
-fn main() {
-    let cli = Cli::parse();
-    
-    match cli.command {
-        Commands::Connect {ip, port } => {
-            println!("Connecting to {}:{}...", ip, port);
+#[derive(Debug, Copy, Clone, Selectable)]
+enum Choice {
+    CreateMember,
+    CreateKeyPackage,
+}
 
-            // Curl du client sur le serv :
-            let url = format!("http://{}:{}/health", ip, port);
-            match reqwest::blocking::get(&url) {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        println!("Connected successfully!");
-                        println!("Serveur response: {}", response.text().unwrap());
-                    }
-                },
-                Err(e) => { eprintln!("{}", e);},
-            }
+impl fmt::Display for Choice {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Choice::CreateMember => write!(f, "Create member"),
+            Choice::CreateKeyPackage => write!(f, "Create key package"),
         }
     }
 }
 
+impl Choice {
+    fn execute(&self) {
+        match self {
+            Choice::CreateMember => println!("Create member"),
+            Choice::CreateKeyPackage => println!("Create key package"),
+        }
+    }
+}
+
+fn main() {
+    // Define ciphersuite ...
+    let ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
+    // ... and the crypto provider to use.
+    let provider = &OpenMlsRustCrypto::default();
+
+    let answer = Choice::select("Choose an option:").prompt();
+
+    match answer {
+        Ok(choice) => choice.execute(),
+        Err(_) => println!("There was an error, please try again"),
+    }
+}
