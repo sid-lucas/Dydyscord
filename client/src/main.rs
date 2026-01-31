@@ -1,3 +1,4 @@
+use crate::user::User;
 use inquire::{InquireError, Select, Text};
 use inquire_derive::Selectable;
 use openmls::prelude::{tls_codec::*, *};
@@ -47,25 +48,24 @@ fn generate_key_package(
 
 #[derive(Debug, Copy, Clone, Selectable)]
 enum Choice {
-    CreateMember,
-    CreateKeyPackage,
+    CreateAccount,
+    ConnectToServer,
 }
 
 impl fmt::Display for Choice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Choice::CreateMember => write!(f, "Create member"),
-            Choice::CreateKeyPackage => write!(f, "Create key package"),
+            Choice::CreateAccount => write!(f, "Create account"),
+            Choice::ConnectToServer => write!(f, "Connect to server"),
         }
     }
 }
 
-impl Choice {
-    fn execute(&self) {
-        match self {
-            Choice::CreateMember => println!("Create member"),
-            Choice::CreateKeyPackage => println!("Create key package"),
-        }
+fn create_user() -> Option<User> {
+    let username = Text::new("Enter your username:").prompt();
+    match username {
+        Ok(name) => Some(User::new(name)),
+        Err(_) => None,
     }
 }
 
@@ -75,10 +75,23 @@ fn main() {
     // ... and the crypto provider to use.
     let provider = &OpenMlsRustCrypto::default();
 
-    let answer = Choice::select("Choose an option:").prompt();
+    loop {
+        let answer = Choice::select("Choose an option:")
+            .prompt()
+            .expect("An error occurred");
 
-    match answer {
-        Ok(choice) => choice.execute(),
-        Err(_) => println!("There was an error, please try again"),
+        match answer {
+            Choice::CreateAccount => {
+                let user = create_user();
+                match user {
+                    Some(u) => println!("Created user: {}", u),
+                    None => println!("Failed to create user."),
+                }
+            }
+            Choice::ConnectToServer => {
+                println!("Connecting to server...");
+                // Further connection logic would go here.
+            }
+        }
     }
 }
