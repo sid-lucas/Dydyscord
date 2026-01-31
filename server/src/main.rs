@@ -30,6 +30,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(handlers::root))
         .route("/users", post(handlers::create_user))
+        .route("/register/start", post(handlers::RegistrationRequest))
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind(SERVER_ADDR).await.unwrap();
