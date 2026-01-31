@@ -10,3 +10,4 @@ openmls = "0.7.1"
 openmls_basic_credential = "0.4.1"
 openmls_rust_crypto = "0.4.1"
 reqwest = { version = "0.13.1", features = ["blocking"] }
+uuid = { version = "1.20.0", features = ["v4"] }

@@ -191,6 +191,7 @@ dependencies = [
  "openmls_basic_credential",
  "openmls_rust_crypto",
  "reqwest",
+ "uuid",
 ]
 
 [[package]]
