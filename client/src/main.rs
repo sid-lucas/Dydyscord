@@ -6,7 +6,6 @@ use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use std::fmt;
 mod user;
-mod opaque;
 
 // A helper to create and store credentials.
 fn generate_credential_with_key(
