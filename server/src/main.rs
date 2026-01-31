@@ -10,6 +10,8 @@ mod models;
 
 const SERVER_ADDR: &str = "0.0.0.0:3000";
 
+mod opaque;
+
 #[tokio::main]
 async fn main() {
     // initialize tracing

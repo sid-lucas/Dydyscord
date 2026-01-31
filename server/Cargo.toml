@@ -11,3 +11,6 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres"] }
 dotenv = "0.15"
+opaque-ke = "4.0.1"
+rand = "0.8.5"
+sha2 = "0.10.9"
