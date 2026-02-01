@@ -1,12 +1,12 @@
 use crate::user::User;
-use inquire::{InquireError, Select, Text};
+use inquire::{InquireError, Password, Select, Text};
 use inquire_derive::Selectable;
 use openmls::prelude::{tls_codec::*, *};
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use std::fmt;
-mod user;
 mod opaque;
+mod user;
 
 // A helper to create and store credentials.
 fn generate_credential_with_key(
@@ -62,22 +62,11 @@ impl fmt::Display for Choice {
     }
 }
 
-fn create_user() -> Option<User> {
-    let username = Text::new("Enter your username:").prompt();
-    match username {
-        Ok(name) => Some(User::new(name)),
-        Err(_) => None,
-    }
-}
-
 fn main() {
     // Define ciphersuite ...
     let ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
     // ... and the crypto provider to use.
     let provider = &OpenMlsRustCrypto::default();
-
-    // Temporaire pour tester response serv :
-    opaque::register("pass123".as_bytes());
 
     loop {
         let answer = Choice::select("Choose an option:")
@@ -86,11 +75,7 @@ fn main() {
 
         match answer {
             Choice::CreateAccount => {
-                let user = create_user();
-                match user {
-                    Some(u) => println!("Created user: {}", u),
-                    None => println!("Failed to create user."),
-                }
+                opaque::register();
             }
             Choice::ConnectToServer => {
                 println!("Connecting to server...");

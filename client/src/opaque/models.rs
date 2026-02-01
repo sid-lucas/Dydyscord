@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
-pub struct RegisterStartRequest {
-    pub username: String,
+pub struct RegisterStartRequest<'a> {
+    pub username: &'a str,
     pub start_request: String, // base64
 }
 
@@ -12,7 +12,7 @@ pub struct RegisterStartResponse {
 }
 
 #[derive(Serialize)]
-pub struct RegisterFinishRequest {
-    pub username: String,
+pub struct RegisterFinishRequest<'a> {
+    pub username: &'a str,
     pub finish_request: String, // base64
 }

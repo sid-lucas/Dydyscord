@@ -1,32 +1,44 @@
-use rand::RngCore;
-use rand::rngs::OsRng;
-use opaque_ke::{
-    CipherSuite, ClientRegistration, ClientRegistrationFinishParameters, RegistrationResponse
-};
+use crate::opaque::models::{RegisterFinishRequest, RegisterStartRequest, RegisterStartResponse};
 use base64::Engine;
-use crate::opaque::models::{
-    RegisterStartRequest, RegisterStartResponse, RegisterFinishRequest
+use inquire::{InquireError, Password, Select, Text};
+use opaque_ke::{
+    CipherSuite, ClientRegistration, ClientRegistrationFinishParameters, RegistrationResponse,
 };
+use rand::rngs::OsRng;
 
 pub mod models;
 
 // EXEMPLE DE LA DOC, A MODIFIER ?
 // A DEPLACER DANS UN ENDROIT PLUS GLOBAL ?
 struct Default;
-impl CipherSuite for Default { 
+impl CipherSuite for Default {
     type OprfCs = opaque_ke::Ristretto255;
     type KeyExchange = opaque_ke::TripleDh<opaque_ke::Ristretto255, sha2::Sha512>;
     type Ksf = opaque_ke::ksf::Identity;
 }
-// Variable temporaire pour les tests
-const TEMP_USERNAME: &str = "my_username";
 
+pub fn register() {
+    let username = Text::new("Enter your username:").prompt();
+    let username = match username {
+        Ok(username) => username,
+        Err(_) => {
+            eprintln!("Failed to read username.");
+            return;
+        }
+    };
+    let password = Password::new("Enter your password:").prompt();
+    let password = match password {
+        Ok(password) => password.into_bytes(),
+        Err(_) => {
+            eprintln!("Failed to read password.");
+            return;
+        }
+    };
 
-pub fn register(password: &[u8]) {
     let mut client_rng = OsRng;
 
     // Démarrer le register avec OPAQUE
-    let start = ClientRegistration::<Default>::start(&mut client_rng, password)
+    let start = ClientRegistration::<Default>::start(&mut client_rng, &password)
         .expect("ClientRegistration::start failed");
 
     // Recup du message et conversion en bytes puis base64 pour envoi au serveur
@@ -40,7 +52,7 @@ pub fn register(password: &[u8]) {
     // TODO : Séparer dans un fichier qui s'occupe du networking et remplacer par appel fonction :
     let url = "http://0.0.0.0:3000/register/start";
     let payload = RegisterStartRequest {
-        username: TEMP_USERNAME.to_string(),
+        username: &username,
         start_request: start_message_b64.to_string(),
     };
 
@@ -71,7 +83,7 @@ pub fn register(password: &[u8]) {
     let finish = start_state
         .finish(
             &mut client_rng,
-            password,
+            &password,
             response,
             ClientRegistrationFinishParameters::default(),
         )
@@ -81,14 +93,11 @@ pub fn register(password: &[u8]) {
     let finish_message_bytes = finish.message.serialize();
     let finish_message_b64 = base64::engine::general_purpose::STANDARD.encode(finish_message_bytes);
 
-
-
-
     // Curl du client sur le serv :
     // TODO : Séparer dans un fichier qui s'occupe du networking et remplacer par appel fonction :
     let url = "http://0.0.0.0:3000/register/finish";
     let payload = RegisterFinishRequest {
-        username: TEMP_USERNAME.to_string(),
+        username: &username,
         finish_request: finish_message_b64.to_string(),
     };
 
@@ -103,5 +112,4 @@ pub fn register(password: &[u8]) {
             eprintln!("{}", e);
         }
     }
-
 }
