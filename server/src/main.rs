@@ -3,26 +3,26 @@ use axum::{
     routing::{get, post},
 };
 use dotenv::dotenv;
-use sqlx::postgres::PgPoolOptions;
-use sqlx::PgPool;
-use std::sync::Arc;
 use opaque_ke::ServerSetup;
+use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
+use std::sync::Arc;
 
-// ca c'est le truc ou jsp si faut le déplacer, il est dans opaque/mod.rs
 use crate::opaque::OpaqueCiphersuite;
 
 mod handlers;
-mod models;
+mod database;
 mod opaque;
 
 const SERVER_ADDR: &str = "0.0.0.0:3000";
 
+// TODO: vérifier si ça clone vraiment
+// TODO: ARC???
 #[derive(Clone)]
 pub struct ServerState {
     pub pool: PgPool,
     pub opaque_setup: Arc<ServerSetup<OpaqueCiphersuite>>,
 }
-
 
 #[tokio::main]
 async fn main() {

@@ -1,13 +1,7 @@
 use crate::ServerState;
-use crate::models::{
-    CreateUserPayload, User
-};
-use crate::opaque::{
-    OpaqueCiphersuite
-};
-use crate::opaque::models::{
-    RegisterStartRequest, RegisterStartResponse, RegisterFinishRequest
-};
+use crate::database::models::{CreateUserPayload, User};
+use crate::opaque::OpaqueCiphersuite;
+use crate::opaque::models::{RegisterFinishRequest, RegisterStartRequest, RegisterStartResponse};
 use axum::{Json, extract::State, http::StatusCode};
 use base64::Engine;
 use opaque_ke::RegistrationRequest;
@@ -34,19 +28,17 @@ pub async fn create_user(
     Ok((StatusCode::CREATED, Json(user)))
 }
 
-
 pub async fn register_start(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterStartRequest>,
 ) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
-
     // Récupération et décodage de la requête du client
     let registration_request_bytes = base64::engine::general_purpose::STANDARD
         .decode(&payload.start_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let registration_request =
         RegistrationRequest::<OpaqueCiphersuite>::deserialize(&registration_request_bytes)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+            .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Récupération du nom d'utilisateur
     let username = payload.username;
@@ -60,10 +52,11 @@ pub async fn register_start(
         &state.opaque_setup,
         registration_request,
         username.as_bytes(),
-    ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let registration_response = base64::engine::general_purpose::STANDARD
-        .encode(registration_response.message.serialize());
+    let registration_response =
+        base64::engine::general_purpose::STANDARD.encode(registration_response.message.serialize());
 
     // Création de la réponse et envoi
     let response = RegisterStartResponse {
@@ -72,22 +65,17 @@ pub async fn register_start(
     Ok((StatusCode::OK, Json(response)))
 }
 
-
-
 pub async fn register_finish(
     Json(payload): Json<RegisterFinishRequest>,
 ) -> Result<(StatusCode), StatusCode> {
-
     // Récupération et décodage de la requête du client
     let upload_bytes = base64::engine::general_purpose::STANDARD
         .decode(&payload.finish_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let upload = 
-        RegistrationUpload::<OpaqueCiphersuite>::deserialize(&upload_bytes)
+    let upload = RegistrationUpload::<OpaqueCiphersuite>::deserialize(&upload_bytes)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     let opaque_record = ServerRegistration::finish(upload);
-
 
     // Récupération du nom d'utilisateur
     let username = payload.username;
@@ -95,7 +83,6 @@ pub async fn register_finish(
     // TODO :
     // Recalculer le login_lookup avec le server_pepper et username
     // Stocker le opaque_record dans la BDD associé au login_lookup
-
 
     Ok(StatusCode::OK)
 }
