@@ -7,10 +7,9 @@ use sqlx::postgres::PgPoolOptions;
 
 mod handlers;
 mod models;
+mod opaque;
 
 const SERVER_ADDR: &str = "0.0.0.0:3000";
-
-mod opaque;
 
 #[tokio::main]
 async fn main() {
@@ -30,7 +29,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(handlers::root))
         .route("/users", post(handlers::create_user))
-        .route("/register/start", post(handlers::RegistrationRequest))
+        .route("/register/start", post(handlers::registration_request))
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind(SERVER_ADDR).await.unwrap();

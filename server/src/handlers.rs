@@ -1,12 +1,17 @@
 use crate::models::{
-    CreateUserPayload, RegisterStartRequest, RegisterStartResponse, User
+    CreateUserPayload, User
+};
+use crate::opaque::{
+    make_server_setup, OpaqueCiphersuite
+};
+use crate::opaque::models::{
+    RegisterStartRequest, RegisterStartResponse
 };
 use axum::{Json, extract::State, http::StatusCode};
 use sqlx::PgPool;
 use base64::Engine;
 use opaque_ke::RegistrationRequest;
 use opaque_ke::ServerRegistration;
-use crate::opaque::{make_server_setup, OpaqueCiphersuite};
 
 pub async fn root() -> (StatusCode, &'static str) {
     (StatusCode::OK, "Dydyscord Server is running!")
@@ -29,7 +34,7 @@ pub async fn create_user(
 }
 
 
-pub async fn RegistrationRequest(
+pub async fn registration_request(
     Json(payload): Json<RegisterStartRequest>,
 ) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
 

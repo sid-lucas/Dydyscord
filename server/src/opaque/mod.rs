@@ -2,6 +2,8 @@ use opaque_ke::CipherSuite;
 use opaque_ke::ServerSetup;
 use rand::rngs::OsRng;
 
+pub mod models;
+
 
 pub struct OpaqueCiphersuite;
 
