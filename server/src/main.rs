@@ -22,7 +22,8 @@ const SERVER_ADDR: &str = "0.0.0.0:3000";
 pub struct ServerState {
     pub pool: PgPool,
     pub opaque_setup: Arc<ServerSetup<OpaqueCiphersuite>>,
-    pub pepper: [u8; 64],
+    pub pepper: [u8; 64], // TODO: Je sais pas si c'est une bonne pratique d'avoir le pepper en mémoire comme ça,
+                          // Ou si on devrait le recup du .env à chaque fois..?
 }
 
 #[tokio::main]

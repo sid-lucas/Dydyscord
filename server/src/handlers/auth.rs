@@ -25,6 +25,7 @@ pub async fn register_start(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterStartRequest>,
 ) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
+
     // Récupération et décodage de la requête du client
     let registration_request_bytes = base64::engine::general_purpose::STANDARD
         .decode(&payload.start_request)
@@ -62,6 +63,7 @@ pub async fn register_finish(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterFinishRequest>,
 ) -> Result<(StatusCode), StatusCode> {
+
     // Récupération et décodage de la requête du client
     let upload_bytes = base64::engine::general_purpose::STANDARD
         .decode(&payload.finish_request)
@@ -78,6 +80,7 @@ pub async fn register_finish(
 
     // TODO :
     // Stocker le opaque_record dans la BDD associé au login_lookup
+    
 
     Ok(StatusCode::OK)
 }
