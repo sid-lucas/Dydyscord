@@ -1,6 +1,7 @@
+use crate::api;
 use crate::opaque::models::{RegisterFinishRequest, RegisterStartRequest, RegisterStartResponse};
 use base64::Engine;
-use inquire::{InquireError, Password, Select, Text};
+use inquire::{Password, Text};
 use opaque_ke::{
     CipherSuite, ClientRegistration, ClientRegistrationFinishParameters, RegistrationResponse,
 };
@@ -48,29 +49,17 @@ pub fn register() {
     // Recup du state (pour register_finish)
     let start_state = start.state;
 
-    // Curl du client sur le serv :
-    // TODO : Séparer dans un fichier qui s'occupe du networking et remplacer par appel fonction :
-    let url = "http://0.0.0.0:3000/register/start";
     let payload = RegisterStartRequest {
         username: &username,
         start_request: start_message_b64.to_string(),
     };
-
-    // TODO : Remplacer aussi par le fichier networking qui retourne juste la réponse ici
-    let mut registration_response = String::new();
-    let client = reqwest::blocking::Client::new();
-    match client.post(url).json(&payload).send() {
-        Ok(response) => {
-            if response.status().is_success() {
-                let response_payload = response.json::<RegisterStartResponse>().unwrap();
-                registration_response = response_payload.start_response;
-                println!("Serveur response: {}", registration_response);
-            }
-        }
+    let registration_response = match api::opaque_register(payload) {
+        Ok(response) => response,
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("Failed to send registration start request: {}", e);
+            return;
         }
-    }
+    };
 
     // Décoder la registration réponse du serveur
     let response_bytes = base64::engine::general_purpose::STANDARD
@@ -93,23 +82,17 @@ pub fn register() {
     let finish_message_bytes = finish.message.serialize();
     let finish_message_b64 = base64::engine::general_purpose::STANDARD.encode(finish_message_bytes);
 
-    // Curl du client sur le serv :
-    // TODO : Séparer dans un fichier qui s'occupe du networking et remplacer par appel fonction :
-    let url = "http://0.0.0.0:3000/register/finish";
     let payload = RegisterFinishRequest {
         username: &username,
         finish_request: finish_message_b64.to_string(),
     };
 
-    // TODO : Remplacer aussi par le fichier networking qui retourne juste la réponse ici
-    match client.post(url).json(&payload).send() {
-        Ok(response) => {
-            if response.status().is_success() {
-                println!("Final registration upload sent successfully.");
-            }
+    match api::opaque_register_finish(payload) {
+        Ok(_) => {
+            println!("Registration completed successfully.");
         }
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("Failed to send registration finish request: {}", e);
         }
     }
 }

@@ -5,6 +5,7 @@ use openmls::prelude::{tls_codec::*, *};
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use std::fmt;
+mod api;
 mod opaque;
 mod user;
 
