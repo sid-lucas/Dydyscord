@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use crate::opaque::OpaqueCiphersuite;
 
-mod handlers;
 mod database;
+mod handlers;
 mod opaque;
 
 const SERVER_ADDR: &str = "0.0.0.0:3000";
@@ -35,9 +35,7 @@ async fn main() {
     dotenv().ok();
 
     // Setup database connection pool
-    let pepper = hex::decode(
-        std::env::var("SERVER_PEPPER")
-        .expect("SERVER_PEPPER must be set"))
+    let pepper = hex::decode(std::env::var("SERVER_PEPPER").expect("SERVER_PEPPER must be set"))
         .expect("SERVER_PEPPER invalid hex");
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = PgPoolOptions::new()
@@ -55,7 +53,6 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(handlers::root))
-        .route("/users", post(handlers::users::create_user))
         .route("/register/start", post(handlers::auth::register_start))
         .route("/register/finish", post(handlers::auth::register_finish))
         .with_state(server_state);
