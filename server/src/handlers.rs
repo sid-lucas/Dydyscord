@@ -40,7 +40,7 @@ pub async fn registration_request(
 
     // Récupération et décodage de la requête du client
     let registration_request_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&payload.registration_request)
+        .decode(&payload.start_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let registration_request =
         RegistrationRequest::<OpaqueCiphersuite>::deserialize(&registration_request_bytes)
@@ -48,6 +48,9 @@ pub async fn registration_request(
 
     // Récupération du nom d'utilisateur
     let username = payload.username;
+
+    // TODO :
+    // Calculer le login_lookup avec le server_pepper et username, et stocker qqn part
 
     // Réalisation de la Registration Response côté serveur pour le client
     // ATTENTION : pour l'instant le ServerSetup est recréé à chaque requête, il faudra le persister
@@ -62,7 +65,7 @@ pub async fn registration_request(
 
     // Création de la réponse et envoi
     let response = RegisterStartResponse {
-        registration_response,
+        start_response: registration_response,
     };
     Ok((StatusCode::OK, Json(response)))
 }
