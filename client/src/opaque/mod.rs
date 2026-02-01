@@ -1,26 +1,27 @@
-use opaque_ke::ClientRegistration;
 use rand::RngCore;
 use rand::rngs::OsRng;
-use opaque_ke::CipherSuite;
+use opaque_ke::{
+    CipherSuite, ClientRegistration
+};
 use base64::Engine;
-use serde::Serialize;
+use crate::opaque::models::{
+    RegistrationRequest
+};
 
+pub mod models;
+
+// EXEMPLE DE LA DOC, A MODIFIER ?
+// A DEPLACER DANS UN ENDROIT PLUS GLOBAL ?
 struct Default;
-
-impl CipherSuite for Default { // EXEMPLE DE LA DOC, A MODIFIER ?
+impl CipherSuite for Default { 
     type OprfCs = opaque_ke::Ristretto255;
     type KeyExchange = opaque_ke::TripleDh<opaque_ke::Ristretto255, sha2::Sha512>;
     type Ksf = opaque_ke::ksf::Identity;
 }
-
+// Variable temporaire pour les tests
 const TEMP_USERNAME: &str = "my_username";
 const TEMP_PASSWORD: &[u8] = b"My_password-123";
 
-#[derive(Serialize)]
-struct RegistrationRequest {
-    username: String,
-    registration_request: String,
-}
 
 pub fn register_start() {
     let mut client_rng = OsRng;
