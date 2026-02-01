@@ -77,7 +77,7 @@ fn main() {
     let provider = &OpenMlsRustCrypto::default();
 
     // Temporaire pour tester response serv :
-    opaque::register_start();
+    opaque::register("pass123".as_bytes());
 
     loop {
         let answer = Choice::select("Choose an option:")

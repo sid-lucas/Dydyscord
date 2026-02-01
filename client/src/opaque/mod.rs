@@ -92,4 +92,16 @@ pub fn register(password: &[u8]) {
         finish_request: finish_message_b64.to_string(),
     };
 
+    // TODO : Remplacer aussi par le fichier networking qui retourne juste la réponse ici
+    match client.post(url).json(&payload).send() {
+        Ok(response) => {
+            if response.status().is_success() {
+                println!("Final registration upload sent successfully.");
+            }
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+        }
+    }
+
 }
