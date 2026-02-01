@@ -1345,6 +1345,8 @@ dependencies = [
  "axum",
  "base64",
  "dotenv",
+ "hex",
+ "hmac",
  "opaque-ke",
  "rand",
  "serde",

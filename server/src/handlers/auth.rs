@@ -1,5 +1,4 @@
 use crate::ServerState;
-use crate::database::models::{CreateUserPayload, User};
 use crate::opaque::OpaqueCiphersuite;
 use crate::opaque::models::{RegisterFinishRequest, RegisterStartRequest, RegisterStartResponse};
 use axum::{Json, extract::State, http::StatusCode};
@@ -7,25 +6,19 @@ use base64::Engine;
 use opaque_ke::RegistrationRequest;
 use opaque_ke::RegistrationUpload;
 use opaque_ke::ServerRegistration;
+use hmac::Mac;
 
-pub async fn root() -> (StatusCode, &'static str) {
-    (StatusCode::OK, "Dydyscord Server is running!")
-}
 
-pub async fn create_user(
-    State(state): State<ServerState>,
-    Json(payload): Json<CreateUserPayload>,
-) -> Result<(StatusCode, Json<User>), StatusCode> {
-    let user = sqlx::query_as!(
-        User,
-        "INSERT INTO users (username) VALUES ($1) RETURNING id, username",
-        payload.username
-    )
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok((StatusCode::CREATED, Json(user)))
+fn login_lookup(pepper: &[u8], username: &str) -> Vec<u8> {
+    let normalized = username.trim().to_lowercase();
+
+    let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(pepper)
+        .expect("HMAC can take key of any size");
+
+    mac.update(normalized.as_bytes());
+
+    mac.finalize().into_bytes().to_vec()
 }
 
 pub async fn register_start(
@@ -43,15 +36,15 @@ pub async fn register_start(
     // Récupération du nom d'utilisateur
     let username = payload.username;
 
-    // TODO :
-    // Calculer le login_lookup avec le server_pepper et username, et stocker qqn part
+    // Calculer le login_lookup avec le server_pepper et username
+    let login_lookup = login_lookup(&state.pepper, &username);
 
     // Réalisation de la Registration Response côté serveur pour le client
     // A CHANGER : le credential_identifier doit être le login_lookup calculé et pas l'username directement...
     let registration_response = ServerRegistration::<OpaqueCiphersuite>::start(
         &state.opaque_setup,
         registration_request,
-        username.as_bytes(),
+        login_lookup.as_slice(),
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -66,6 +59,7 @@ pub async fn register_start(
 }
 
 pub async fn register_finish(
+    State(state): State<ServerState>,
     Json(payload): Json<RegisterFinishRequest>,
 ) -> Result<(StatusCode), StatusCode> {
     // Récupération et décodage de la requête du client
@@ -79,9 +73,10 @@ pub async fn register_finish(
 
     // Récupération du nom d'utilisateur
     let username = payload.username;
+    // Recalculer le login_lookup avec le server_pepper et username
+    let login_lookup = login_lookup(&state.pepper, &username);
 
     // TODO :
-    // Recalculer le login_lookup avec le server_pepper et username
     // Stocker le opaque_record dans la BDD associé au login_lookup
 
     Ok(StatusCode::OK)

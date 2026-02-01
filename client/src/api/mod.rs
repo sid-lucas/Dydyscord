@@ -16,7 +16,7 @@ pub fn opaque_register_finish(
     let url = format!("{SERVER_URL}/register/finish");
     let client = reqwest::blocking::Client::new();
     let response = client.post(&url).json(&payload).send()?;
-    Ok(response.text()?)
+    response.text()
 }
 
 // Peut etre remplacer en api_port général comme ça :
