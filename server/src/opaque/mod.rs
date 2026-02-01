@@ -4,7 +4,6 @@ use rand::rngs::OsRng;
 
 pub mod models;
 
-
 pub struct OpaqueCiphersuite;
 
 impl CipherSuite for OpaqueCiphersuite {
@@ -15,9 +14,5 @@ impl CipherSuite for OpaqueCiphersuite {
 
 pub fn make_server_setup() -> ServerSetup<OpaqueCiphersuite> {
     let mut rng = OsRng;
-    ServerSetup::<OpaqueCiphersuite>::new(&mut rng) // CE SETUP DOIT ETRE STOCKE (PERSISTENT) ET UTILISÉ POUR TOUS LES CLIENTS
-                                          // POUR L'INSTANT, SEULEMENT GARDé EN MEMOIRE
-
-    // IL FAUDRAIT FAIRE QU'ON LE CRÉE UNE FOIS UNIQUEMENT
-    // PUIS ON LE CHARGE DEPUIS LA BDD A CHAQUE DEMARRAGE DU SERVEUR
+    ServerSetup::<OpaqueCiphersuite>::new(&mut rng) // appelé une seule fois au démarrage du serveur
 }

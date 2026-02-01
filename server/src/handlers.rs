@@ -1,14 +1,14 @@
+use crate::ServerState;
 use crate::models::{
     CreateUserPayload, User
 };
 use crate::opaque::{
-    make_server_setup, OpaqueCiphersuite
+    OpaqueCiphersuite
 };
 use crate::opaque::models::{
     RegisterStartRequest, RegisterStartResponse, RegisterFinishRequest
 };
 use axum::{Json, extract::State, http::StatusCode};
-use sqlx::PgPool;
 use base64::Engine;
 use opaque_ke::RegistrationRequest;
 use opaque_ke::RegistrationUpload;
@@ -19,7 +19,7 @@ pub async fn root() -> (StatusCode, &'static str) {
 }
 
 pub async fn create_user(
-    State(pool): State<PgPool>,
+    State(state): State<ServerState>,
     Json(payload): Json<CreateUserPayload>,
 ) -> Result<(StatusCode, Json<User>), StatusCode> {
     let user = sqlx::query_as!(
@@ -27,7 +27,7 @@ pub async fn create_user(
         "INSERT INTO users (username) VALUES ($1) RETURNING id, username",
         payload.username
     )
-    .fetch_one(&pool)
+    .fetch_one(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -36,6 +36,7 @@ pub async fn create_user(
 
 
 pub async fn register_start(
+    State(state): State<ServerState>,
     Json(payload): Json<RegisterStartRequest>,
 ) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
 
@@ -54,10 +55,9 @@ pub async fn register_start(
     // Calculer le login_lookup avec le server_pepper et username, et stocker qqn part
 
     // Réalisation de la Registration Response côté serveur pour le client
-    // ATTENTION : pour l'instant le ServerSetup est recréé à chaque requête, il faudra le persister
     // A CHANGER : le credential_identifier doit être le login_lookup calculé et pas l'username directement...
     let registration_response = ServerRegistration::<OpaqueCiphersuite>::start(
-        &make_server_setup(),
+        &state.opaque_setup,
         registration_request,
         username.as_bytes(),
     ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
