@@ -18,3 +18,15 @@ pub fn opaque_register_finish(
     let response = client.post(&url).json(&payload).send()?;
     Ok(response.text()?)
 }
+
+// Peut etre remplacer en api_port général comme ça :
+//pub fn api_post<Req, Res>(path: &str, payload: &Req) -> Result<Res, reqwest::Error>
+//where
+//    Req: Serialize + ?Sized,
+//    Res: DeserializeOwned,
+//{
+//    let client = reqwest::blocking::Client::new();
+//    let url = format!("{SERVER_URL}{path}");
+//    let response = client.post(url).json(payload).send()?;
+//    Ok(response.json::<Res>()?)
+//}
