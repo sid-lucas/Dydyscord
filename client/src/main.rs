@@ -6,6 +6,7 @@ use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use std::fmt;
 mod user;
+mod opaque;
 
 // A helper to create and store credentials.
 fn generate_credential_with_key(
@@ -74,6 +75,9 @@ fn main() {
     let ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
     // ... and the crypto provider to use.
     let provider = &OpenMlsRustCrypto::default();
+
+    // Temporaire pour tester response serv :
+    opaque::register_start();
 
     loop {
         let answer = Choice::select("Choose an option:")
