@@ -57,8 +57,8 @@ enum Choice {
 impl fmt::Display for Choice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Choice::Register => write!(f, "Create a new account"),
-            Choice::Login => write!(f, "Log in to an existing account"),
+            Choice::Register => write!(f, "Sign Up"),
+            Choice::Login => write!(f, "Log In"),
         }
     }
 }

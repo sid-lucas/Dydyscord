@@ -5,18 +5,18 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
 pub struct RegisterStartRequest {
     pub username: String,
-    pub register_request: String, // base64
+    pub start_register_request: String, // base64
 }
 
 #[derive(Serialize)]
 pub struct RegisterStartResponse {
-    pub register_response: String, // base64
+    pub start_register_response: String, // base64
 }
 
 #[derive(Deserialize)]
 pub struct RegisterFinishRequest {
     pub username: String,
-    pub finish_request: String, // base64
+    pub finish_register_request: String, // base64
 }
 
 // Login
