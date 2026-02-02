@@ -32,15 +32,14 @@ pub async fn register_start(
     Json(payload): Json<RegisterStartRequest>,
 ) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
 
-    // Récupération et décodage de la requête du client
-    let registration_request_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&payload.start_request)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let registration_request =
-        RegistrationRequest::<OpaqueCiphersuite>::deserialize(&registration_request_bytes)
-            .map_err(|_| StatusCode::BAD_REQUEST)?;
-
-        let temp = ServerRegistration::<OpaqueCiphersuite>::deserialize(&registration_request_bytes);
+    // Récupération du register_request du client et décodage/désérialisation
+    let register_request =
+    RegistrationRequest::<OpaqueCiphersuite>::deserialize(
+        &base64::engine::general_purpose::STANDARD
+            .decode(&payload.register_request)
+            .map_err(|_| StatusCode::BAD_REQUEST)?,
+    )
+    .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Récupération du nom d'utilisateur
     let username = payload.username;
@@ -48,21 +47,21 @@ pub async fn register_start(
     // Calculer le login_lookup avec le server_pepper et username
     let login_lookup = login_lookup(&state.pepper, &username);
 
-    // Réalisation de la Registration Response côté serveur pour le client
-    // A CHANGER : le credential_identifier doit être le login_lookup calculé et pas l'username directement...
-    let registration_response = ServerRegistration::<OpaqueCiphersuite>::start(
+    // Démarrer le register server avec OPAQUE
+    let server_register_start_result = ServerRegistration::<OpaqueCiphersuite>::start(
         &state.opaque_setup,
-        registration_request,
+        register_request,
         login_lookup.as_slice(),
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let registration_response = base64::engine::general_purpose::STANDARD
-        .encode(registration_response.message.serialize());
+    // Préparation de la request à envoyer au serveur
+    let register_response = base64::engine::general_purpose::STANDARD
+        .encode(server_register_start_result.message.serialize());
 
     // Création de la réponse et envoi
     let response = RegisterStartResponse {
-        start_response: registration_response, // TODO SIMPLIFIER AVEC NOM COMMUN
+        register_response,
     };
     Ok((StatusCode::OK, Json(response)))
 }

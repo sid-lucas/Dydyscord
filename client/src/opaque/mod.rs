@@ -9,6 +9,27 @@ use rand::rngs::OsRng;
 
 pub mod models;
 
+#[derive(Debug)]
+pub enum ClientError {
+    Input,
+    Api(String),
+    Base64,
+    Opaque,
+}
+
+impl std::fmt::Display for ClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ClientError::Input => write!(f, "input error"),
+            ClientError::Api(s) => write!(f, "api error: {s}"),
+            ClientError::Base64 => write!(f, "invalid base64"),
+            ClientError::Opaque => write!(f, "opaque protocol error"),
+        }
+    }
+}
+
+impl std::error::Error for ClientError {}
+
 // EXEMPLE DE LA DOC, A MODIFIER ?
 // A DEPLACER DANS UN ENDROIT PLUS GLOBAL ?
 struct Default;
@@ -18,88 +39,77 @@ impl CipherSuite for Default {
     type Ksf = opaque_ke::ksf::Identity;
 }
 
-pub fn register() {
-    let username = Text::new("Enter your username:").prompt();
-    let username = match username {
-        Ok(username) => username,
-        Err(_) => {
-            eprintln!("Failed to read username.");
-            return;
-        }
-    };
-    let password = Password::new("Enter your password:").prompt();
-    let password = match password {
-        Ok(password) => password.into_bytes(),
-        Err(_) => {
-            eprintln!("Failed to read password.");
-            return;
-        }
-    };
+pub fn register() -> Result<(), ClientError> {
+    let username = Text::new("Enter your username:")
+        .prompt()
+        .map_err(|_| ClientError::Input)?;
+
+    let password = Password::new("Enter your password:")
+        .prompt()
+        .map_err(|_| ClientError::Input)?
+        .into_bytes();
 
     let mut client_rng = OsRng;
 
-    // Démarrer le register avec OPAQUE
-    let start = ClientRegistration::<Default>::start(&mut client_rng, &password)
-        .expect("ClientRegistration::start failed");
-
-    // Recup du message et conversion en bytes puis base64 pour envoi au serveur
-    let start_message_bytes = start.message.serialize();
-    let start_message_b64 = base64::engine::general_purpose::STANDARD.encode(start_message_bytes);
+    // Démarrer le register client avec OPAQUE
+    let start = ClientRegistration::<Default>::start(
+        &mut client_rng, 
+        &password
+    ).map_err(|_| ClientError::Opaque)?;
 
     // Recup du state (pour register_finish)
     let start_state = start.state;
 
-    // Envoi de la requête register au serveur et réception de la réponse
-    let payload = RegisterStartRequest {
-        username: &username,
-        start_request: start_message_b64.to_string(),
-    };
-    let registration_response = match api::opaque_register(payload) {
-        Ok(response) => response,
-        Err(e) => {
-            eprintln!("Failed to send registration start request: {}", e);
-            return;
-        }
-    };
+    // Préparation de la request à envoyer au serveur
+    let start_register_request = base64::engine::general_purpose::STANDARD
+        .encode(start.message.serialize());
 
-    // Décoder la registration réponse du serveur
-    let response_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&registration_response)
-        .expect("Decoding base64 failed");
-    let response = RegistrationResponse::<Default>::deserialize(&response_bytes)
-        .expect("RegistrationResponse::deserialize failed");
+    // Call API (envoi requête et réception réponse)
+    let register_response_b64 = api::opaque_register(RegisterStartRequest {
+        username: &username,
+        start_register_request,
+    })
+    .map_err(|e| ClientError::Api(e.to_string()))?;
+
+    // Response base64 -> bytes
+    let register_response_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&register_response_b64)
+        .map_err(|_| ClientError::Base64)?;
+    // Response désérialisation
+    let register_response = RegistrationResponse::<Default>::deserialize(&register_response_bytes)
+        .map_err(|_| ClientError::Opaque)?;
 
     // Démarrer le finish avec la réponse du serveur
     let finish = start_state
         .finish(
             &mut client_rng,
             &password,
-            response,
+            register_response,
             ClientRegistrationFinishParameters::default(),
         )
-        .expect("ClientRegistration::finish failed");
+        .map_err(|_| ClientError::Opaque)?;
 
-    // Recup du message et conversion en bytes puis base64 pour envoi au serveur
-    let finish_message_bytes = finish.message.serialize();
-    let finish_message_b64 = base64::engine::general_purpose::STANDARD.encode(finish_message_bytes);
+    // Préparation de la request à envoyer au serveur
+    let finish_register_request = base64::engine::general_purpose::STANDARD
+        .encode(finish.message.serialize());
 
-    let payload = RegisterFinishRequest {
+    api::opaque_register_finish(RegisterFinishRequest {
         username: &username,
-        finish_request: finish_message_b64.to_string(),
-    };
+        finish_register_request,
+    })
+    .map_err(|e| ClientError::Api(e.to_string()))?;
 
-    match api::opaque_register_finish(payload) {
-        Ok(_) => {
-            println!("Registration completed successfully.");
-        }
-        Err(e) => {
-            eprintln!("Failed to send registration finish request: {}", e);
-        }
-    }
+    println!("Registration completed successfully.");
+
+
+
+
 
     // CA c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
     // Uniquement connue du client.
     let export_key = finish.export_key;
+
+    Ok(())
 }
 
 

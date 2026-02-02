@@ -76,7 +76,9 @@ fn main() {
 
         match answer {
             Choice::CreateAccount => {
-                opaque::register();
+                if let Err(e) = opaque::register() {
+                    eprintln!("Registration failed: {e}");
+                }
             }
             Choice::ConnectToServer => {
                 println!("Connecting to server...");
