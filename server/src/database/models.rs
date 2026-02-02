@@ -3,7 +3,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 pub struct User {
-    pub id: Uuid,
+    pub login_lookup: Vec<u8>,
+    pub opaque_record: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize)]

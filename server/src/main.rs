@@ -55,6 +55,8 @@ async fn main() {
         .route("/", get(handlers::root))
         .route("/register/start", post(handlers::auth::register_start))
         .route("/register/finish", post(handlers::auth::register_finish))
+        .route("/login/start", post(handlers::auth::login_start))
+        .route("/login/finish", post(handlers::auth::login_finish))
         .with_state(server_state);
 
     let listener = tokio::net::TcpListener::bind(SERVER_ADDR).await.unwrap();
