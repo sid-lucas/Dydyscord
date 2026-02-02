@@ -30,10 +30,11 @@ pub struct LoginStartRequest<'a> {
 #[derive(Deserialize)]
 pub struct LoginStartResponse {
     pub start_login_response: String, // base64
+    pub nonce: String, // clé-valeur pour retrouver le server_login_state
 }
 
 #[derive(Serialize)]
-pub struct LoginFinishRequest<'a> {
-    pub username: &'a str,
+pub struct LoginFinishRequest {
     pub finish_login_request: String, // base64
+    pub nonce: String, // clé-valeur pour retrouver le server_login_state
 }

@@ -24,16 +24,16 @@ pub fn opaque_register_finish(
     response.text()
 }
 
-pub fn opaque_login(payload: LoginStartRequest<'_>) -> Result<String, reqwest::Error> {
+pub fn opaque_login(payload: LoginStartRequest<'_>) -> Result<LoginStartResponse, reqwest::Error> {
     let url = format!("{SERVER_URL}/login/start");
     let client = reqwest::blocking::Client::new();
     let response = client.post(&url).json(&payload).send()?;
     let response_body: LoginStartResponse = response.json()?;
-    Ok(response_body.start_login_response)
+    Ok(response_body)
 }
 
 pub fn opaque_login_finish(
-    payload: LoginFinishRequest<'_>,
+    payload: LoginFinishRequest,
 ) -> Result<String, reqwest::Error> {
     let url = format!("{SERVER_URL}/login/finish");
     let client = reqwest::blocking::Client::new();

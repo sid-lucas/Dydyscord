@@ -136,7 +136,7 @@ pub fn login() -> Result<(), ClientError> {
         .encode(start.message.serialize());
 
     // Call API (envoi requête et réception réponse)
-    let login_response_b64 = api::opaque_login(LoginStartRequest {
+    let response = api::opaque_login(LoginStartRequest {
         username: &username,
         start_login_request,
     })
@@ -144,7 +144,7 @@ pub fn login() -> Result<(), ClientError> {
 
     // Response base64 -> bytes
     let login_response_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&login_response_b64)
+        .decode(&response.start_login_response)
         .map_err(|_| ClientError::Base64)?;
     // Response désérialisation
     let login_response = CredentialResponse::<Default>::deserialize(&login_response_bytes)
@@ -165,8 +165,8 @@ pub fn login() -> Result<(), ClientError> {
         .encode(finish.message.serialize());
 
     api::opaque_login_finish(LoginFinishRequest {
-        username: &username,
         finish_login_request,
+        nonce: response.nonce,
     })
     .map_err(|e| ClientError::Api(e.to_string()))?;
 

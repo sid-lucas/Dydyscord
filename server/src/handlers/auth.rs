@@ -5,15 +5,18 @@ use crate::opaque::models::{
     LoginStartRequest, LoginStartResponse, LoginFinishRequest,
 };
 use axum::{Json, extract::State, http::StatusCode};
-use base64::Engine;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use hmac::Mac;
 use rand::rngs::OsRng;
+use rand::RngCore;
 use opaque_ke::{
     ClientLogin, ClientLoginFinishParameters, ClientRegistration,
     ClientRegistrationFinishParameters, CredentialFinalization, CredentialRequest,
     CredentialResponse, RegistrationRequest, RegistrationResponse, RegistrationUpload, ServerLogin,
     ServerLoginParameters, ServerRegistration, ServerRegistrationLen, ServerSetup,
 };
+use redis::AsyncCommands;
+
 use crate::database::models::User;
 
 fn login_lookup(pepper: &[u8], username: &str) -> Vec<u8> {
@@ -101,7 +104,7 @@ pub async fn register_finish(
 }
 
 pub async fn login_start(
-    State(state): State<ServerState>,
+    State(mut state): State<ServerState>,
     Json(payload): Json<LoginStartRequest>,
 ) -> Result<(StatusCode, Json<LoginStartResponse>), StatusCode> {
 
@@ -155,25 +158,73 @@ pub async fn login_start(
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    // Génération d'un nonce unique pour retrouver le server_login_state
+    let mut nonce = [0u8; 32];
+    OsRng.fill_bytes(&mut nonce);
+    let nonce = URL_SAFE_NO_PAD.encode(nonce);
+    let redis_key = format!("opaque:login:{}", &nonce);
+
+    let state_bytes: Vec<u8> = start.state.serialize().to_vec();
+    let ttl_seconds: u64 = 120;
+    // Sauvegarde du server_login_state dans Redis avec expiration
+    let _: () = state.redis
+        .set_ex(&redis_key, state_bytes, ttl_seconds)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+
     // Création de la réponse et envoi
     let start_login_response = base64::engine::general_purpose::STANDARD
         .encode(start.message.serialize());
 
-    Ok((StatusCode::OK, Json(LoginStartResponse { start_login_response })))
+    Ok((StatusCode::OK, Json(LoginStartResponse { start_login_response, nonce })))
 }
 
 pub async fn login_finish(
-    State(state): State<ServerState>,
+    State(mut state): State<ServerState>,
     Json(payload): Json<LoginFinishRequest>,
 ) -> Result<StatusCode, StatusCode> {
 
-    let finish_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&payload.finish_request)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let finish = CredentialFinalization::<OpaqueCiphersuite>::deserialize(&finish_bytes)
+    let redis_key = format!("opaque:login:{}", payload.nonce);
+
+    // Récupération du server_login_state depuis Redis
+    let state_bytes: Option<Vec<u8>> = state.redis
+        .get(&redis_key)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Si le nonce inconnu / expiré
+    let state_bytes: Vec<u8> = match state_bytes {
+        Some(v) => v,
+        None => return Err(StatusCode::UNAUTHORIZED),
+    };
+
+    // Supprimer one-shot (évite replay)
+    let _: () = state.redis
+        .del(&redis_key)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Décode/Désérialise le message final du client
+    let finish_login_request = base64::engine::general_purpose::STANDARD
+        .decode(&payload.finish_login_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    //let session_key = finish.session_key;
+    let finish_login_request = CredentialFinalization::<OpaqueCiphersuite>::deserialize(&finish_login_request)
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    // Désérialiser server_login_state puis finish()
+    let server_login_state = ServerLogin::<OpaqueCiphersuite>::deserialize(&state_bytes)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let finish = server_login_state
+        .finish(
+            finish_login_request,
+            ServerLoginParameters::default(),
+        )
+        .map_err(|_| StatusCode::UNAUTHORIZED)?; // mauvais mdp ou preuve invalide
+
+    let _session_key = finish.session_key;
 
     Ok(StatusCode::OK)
 }
