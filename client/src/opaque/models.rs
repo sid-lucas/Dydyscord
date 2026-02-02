@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-// TODO : Moyen de factoriser les structs, bonne pratique ?
-
 // Register
 
 #[derive(Serialize)]
@@ -12,7 +10,7 @@ pub struct RegisterStartRequest<'a> {
 
 #[derive(Deserialize)]
 pub struct RegisterStartResponse {
-    pub start_response: String, // base64
+    pub start_register_response: String, // base64
 }
 
 #[derive(Serialize)]

@@ -12,7 +12,7 @@ pub fn opaque_register(payload: RegisterStartRequest<'_>) -> Result<String, reqw
     let client = reqwest::blocking::Client::new();
     let response = client.post(&url).json(&payload).send()?;
     let response_body: RegisterStartResponse = response.json()?;
-    Ok(response_body.start_response)
+    Ok(response_body.start_register_response)
 }
 
 pub fn opaque_register_finish(
