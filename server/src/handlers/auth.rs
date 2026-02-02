@@ -41,10 +41,8 @@ pub async fn register_start(
     )
     .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Récupération du nom d'utilisateur
+    // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
     let username = payload.username;
-
-    // Calculer le login_lookup avec le server_pepper et username
     let login_lookup = login_lookup(&state.pepper, &username);
 
     // Démarrer le register server avec OPAQUE
@@ -106,51 +104,62 @@ pub async fn login_start(
     State(state): State<ServerState>,
     Json(payload): Json<LoginStartRequest>,
 ) -> Result<(StatusCode, Json<LoginStartResponse>), StatusCode> {
+
+    // Récupération du start_login_request du client et décodage/désérialisation
+    let start_login_request =
+    CredentialRequest::<OpaqueCiphersuite>::deserialize(
+        &base64::engine::general_purpose::STANDARD
+            .decode(&payload.start_login_request)
+            .map_err(|_| StatusCode::BAD_REQUEST)?,
+    )
+    .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let mut server_rng = OsRng;
     
-    // Récupération du nom d'utilisateur et login_lookup correspondant
+    // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
     let username = payload.username;
     let login_lookup = login_lookup(&state.pepper, &username);
 
-    // Récupération du opaque_record associé au login_lookup dans la BDD
-    let record = sqlx::query_as!(
+    // Récupération du user correspondant au login_lookup dans la BDD
+    let user = sqlx::query_as!(
         User,
-        "SELECT login_lookup, opaque_record FROM users WHERE login_lookup = $1",
+        r#"
+        SELECT id, login_lookup, opaque_record, created_at, updated_at
+        FROM users
+        WHERE login_lookup = $1
+        "#,
         login_lookup,
     )
-    .fetch_one(&state.pool)
+    // fetch_optional pour ne pas révéler l'existence / non-existence d'un user
+    .fetch_optional(&state.pool) 
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let opaque_record = 
-        ServerRegistration::<OpaqueCiphersuite>::deserialize(&record.opaque_record).unwrap();
+    // Désérialisation du opaque_record si user existe
+    let opaque_record= match user {
+        Some(user) => Some(
+            ServerRegistration::<OpaqueCiphersuite>::deserialize(&user.opaque_record)
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+        ),
+        None => None,
+    };
 
-    // Récupération et décodage de la requête du client
-    let login_request_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&payload.start_request)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
-
-    let mut server_rng = OsRng;
-
-    // Réalisation de la Login Response côté serveur pour le client
-    let login_start_result = ServerLogin::start(
+    // Démarrer le login server avec OPAQUE
+    let start = ServerLogin::start(
         &mut server_rng,
         &state.opaque_setup,
-        Some(opaque_record),
-        CredentialRequest::deserialize(&login_request_bytes).unwrap(),
+        opaque_record,
+        start_login_request,
         login_lookup.as_slice(),
         ServerLoginParameters::default(),
     )
-    .unwrap();
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Création de la réponse et envoi
-    let login_response = base64::engine::general_purpose::STANDARD
-        .encode(login_start_result.message.serialize());
+    let start_login_response = base64::engine::general_purpose::STANDARD
+        .encode(start.message.serialize());
 
-    let response = LoginStartResponse {
-        start_response: login_response, // TODO SIMPLIFIER AVEC NOM COMMUN
-    };
-
-    Ok((StatusCode::OK, Json(response)))
+    Ok((StatusCode::OK, Json(LoginStartResponse { start_login_response })))
 }
 
 pub async fn login_finish(

@@ -29,7 +29,7 @@ pub struct LoginStartRequest<'a> {
 
 #[derive(Deserialize)]
 pub struct LoginStartResponse {
-    pub start_response: String, // base64
+    pub start_login_response: String, // base64
 }
 
 #[derive(Serialize)]

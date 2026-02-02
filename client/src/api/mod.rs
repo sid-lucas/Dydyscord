@@ -29,7 +29,7 @@ pub fn opaque_login(payload: LoginStartRequest<'_>) -> Result<String, reqwest::E
     let client = reqwest::blocking::Client::new();
     let response = client.post(&url).json(&payload).send()?;
     let response_body: LoginStartResponse = response.json()?;
-    Ok(response_body.start_response)
+    Ok(response_body.start_login_response)
 }
 
 pub fn opaque_login_finish(
