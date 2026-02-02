@@ -224,6 +224,8 @@ pub async fn login_finish(
         )
         .map_err(|_| StatusCode::UNAUTHORIZED)?; // mauvais mdp ou preuve invalide
 
+
+    // secret partagé entre le client et le serveur
     let _session_key = finish.session_key;
 
     Ok(StatusCode::OK)

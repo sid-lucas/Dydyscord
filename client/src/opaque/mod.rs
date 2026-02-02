@@ -118,6 +118,7 @@ pub fn login() -> Result<(), ClientError> {
         .prompt()
         .map_err(|_| ClientError::Input)?;
 
+    // TODO : Faire que l'utilisateur tape une seule fois le mdp
     let password = Password::new("Enter your password:")
         .prompt()
         .map_err(|_| ClientError::Input)?
