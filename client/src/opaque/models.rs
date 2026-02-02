@@ -24,7 +24,7 @@ pub struct RegisterFinishRequest<'a> {
 #[derive(Serialize)]
 pub struct LoginStartRequest<'a> {
     pub username: &'a str,
-    pub start_request: String, // base64
+    pub start_login_request: String, // base64
 }
 
 #[derive(Deserialize)]
@@ -35,5 +35,5 @@ pub struct LoginStartResponse {
 #[derive(Serialize)]
 pub struct LoginFinishRequest<'a> {
     pub username: &'a str,
-    pub finish_request: String, // base64
+    pub finish_login_request: String, // base64
 }

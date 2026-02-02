@@ -50,15 +50,15 @@ fn generate_key_package(
 
 #[derive(Debug, Copy, Clone, Selectable)]
 enum Choice {
-    CreateAccount,
-    ConnectToServer,
+    Register,
+    Login,
 }
 
 impl fmt::Display for Choice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Choice::CreateAccount => write!(f, "Create account"),
-            Choice::ConnectToServer => write!(f, "Connect to server"),
+            Choice::Register => write!(f, "Create a new account"),
+            Choice::Login => write!(f, "Log in to an existing account"),
         }
     }
 }
@@ -75,14 +75,15 @@ fn main() {
             .expect("An error occurred");
 
         match answer {
-            Choice::CreateAccount => {
+            Choice::Register => {
                 if let Err(e) = opaque::register() {
                     eprintln!("Registration failed: {e}");
                 }
             }
-            Choice::ConnectToServer => {
-                println!("Connecting to server...");
-                // Further connection logic would go here.
+            Choice::Login => {
+                if let Err(e) = opaque::login() {
+                    eprintln!("Login failed: {e}");
+                }
             }
         }
     }

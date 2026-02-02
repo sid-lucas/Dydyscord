@@ -15,6 +15,7 @@ pub enum ClientError {
     Api(String),
     Base64,
     Opaque,
+    InvalidCredentials,
 }
 
 impl std::fmt::Display for ClientError {
@@ -24,6 +25,7 @@ impl std::fmt::Display for ClientError {
             ClientError::Api(s) => write!(f, "api error: {s}"),
             ClientError::Base64 => write!(f, "invalid base64"),
             ClientError::Opaque => write!(f, "opaque protocol error"),
+            ClientError::InvalidCredentials => write!(f, "user unknown or invalid credentials"),
         }
     }
 }
@@ -57,9 +59,6 @@ pub fn register() -> Result<(), ClientError> {
         &password
     ).map_err(|_| ClientError::Opaque)?;
 
-    // Recup du state (pour register_finish)
-    let start_state = start.state;
-
     // Préparation de la request à envoyer au serveur
     let start_register_request = base64::engine::general_purpose::STANDARD
         .encode(start.message.serialize());
@@ -80,7 +79,7 @@ pub fn register() -> Result<(), ClientError> {
         .map_err(|_| ClientError::Opaque)?;
 
     // Démarrer le finish avec la réponse du serveur
-    let finish = start_state
+    let finish = start.state
         .finish(
             &mut client_rng,
             &password,
@@ -114,91 +113,71 @@ pub fn register() -> Result<(), ClientError> {
 
 
 
-pub fn login() {
-    let username = Text::new("Enter your username:").prompt();
-    let username = match username {
-        Ok(username) => username,
-        Err(_) => {
-            eprintln!("Failed to read username.");
-            return;
-        }
-    };
-    let password = Password::new("Enter your password:").prompt();
-    let password = match password {
-        Ok(password) => password.into_bytes(),
-        Err(_) => {
-            eprintln!("Failed to read password.");
-            return;
-        }
-    };
+pub fn login() -> Result<(), ClientError> {
+    let username = Text::new("Enter your username:")
+        .prompt()
+        .map_err(|_| ClientError::Input)?;
+
+    let password = Password::new("Enter your password:")
+        .prompt()
+        .map_err(|_| ClientError::Input)?
+        .into_bytes();
 
     let mut client_rng = OsRng;
 
-    // Démarrer le login avec OPAQUE
-    let start = ClientLogin::<Default>::start(&mut client_rng, &password)
-        .expect("ClientLogin::start failed");
+    // Démarrer le login client avec OPAQUE
+    let start = ClientLogin::<Default>::start(
+        &mut client_rng, 
+        &password
+    ).map_err(|_| ClientError::Opaque)?;
 
-    // Recup du message et conversion en bytes puis base64 pour envoi au serveur
-    let start_message_bytes = start.message.serialize();
-    let start_message_b64 = base64::engine::general_purpose::STANDARD.encode(start_message_bytes);
+    // Préparation de la request à envoyer au serveur
+    let start_login_request = base64::engine::general_purpose::STANDARD
+        .encode(start.message.serialize());
 
-    // Envoi de la requête login au serveur et réception de la réponse
-    let payload = LoginStartRequest {
+    // Call API (envoi requête et réception réponse)
+    let login_response_b64 = api::opaque_login(LoginStartRequest {
         username: &username,
-        start_request: start_message_b64.to_string(),
-    };
-    let login_response = match api::opaque_login(payload) {
-        Ok(response) => response,
-        Err(e) => {
-            eprintln!("Failed to send login start request: {}", e);
-            return;
-        }
-    };
+        start_login_request,
+    })
+    .map_err(|e| ClientError::Api(e.to_string()))?;
 
-    // Décoder la login réponse du serveur
-    let response_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&login_response)
-        .expect("Decoding base64 failed");
+    // Response base64 -> bytes
+    let login_response_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&login_response_b64)
+        .map_err(|_| ClientError::Base64)?;
+    // Response désérialisation
+    let login_response = CredentialResponse::<Default>::deserialize(&login_response_bytes)
+        .map_err(|_| ClientError::Opaque)?;
 
-        
     // Finaliser le login avec la réponse du serveur
-    let finish = start.state.finish(
-        &mut client_rng,
-        &password,
-        CredentialResponse::<Default>::deserialize(&response_bytes).unwrap(),
-        ClientLoginFinishParameters::default(),
-    );
-    if finish.is_err() { // Si mdp incorrect
-        eprintln!("Login failed: Invalid credentials.");
-        return;
-    }
-    
-    let finish = finish.unwrap();
+    let finish = start.state
+        .finish(
+            &mut client_rng,
+            &password,
+            login_response,
+            ClientLoginFinishParameters::default(),
+        )
+        .map_err(|_| ClientError::InvalidCredentials)?;
 
-    // Recup du message et conversion en bytes puis base64 pour envoi au serveur
-    let finish_message_bytes = finish
-    .message
-    .serialize();
-    let finish_message_b64 = base64::engine::general_purpose::STANDARD.encode(finish_message_bytes);
+    // Préparation de la request à envoyer au serveur
+    let finish_login_request = base64::engine::general_purpose::STANDARD
+        .encode(finish.message.serialize());
 
-    let payload = LoginFinishRequest {
+    api::opaque_login_finish(LoginFinishRequest {
         username: &username,
-        finish_request: finish_message_b64.to_string(),
-    };
+        finish_login_request,
+    })
+    .map_err(|e| ClientError::Api(e.to_string()))?;
 
-    match api::opaque_login_finish(payload) {
-        Ok(_) => {
-            println!("Login completed successfully.");
-        }
-        Err(e) => {
-            eprintln!("Failed to send login finish request: {}", e);
-        }
-    }
+    println!("Login completed successfully.");
 
-    // CA c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
+
+    // Ca c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
     // Uniquement connue du client.
-    let export_key = finish.export_key;
-    // CA c'est le secret partagé entre le client et le serveur
-    let session_key = finish.session_key;
+    let _export_key = finish.export_key;
+    // Ca c'est le secret partagé entre le client et le serveur
+    let _session_key = finish.session_key;
 
+    Ok(())
 }
