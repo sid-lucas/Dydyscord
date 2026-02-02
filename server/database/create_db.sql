@@ -6,8 +6,7 @@
 -- \connect dydyscord;
 
 CREATE TABLE IF NOT EXISTS users (
-    -- UUIDv7
-    id UUID PRIMARY KEY DEFAULT uuidv7(),
+    id SERIAL PRIMARY KEY,
     -- Privacy-preserving lookup: HMAC(pepper, normalized_username)
     login_lookup BYTEA NOT NULL UNIQUE,
     -- OPAQUE registration record
