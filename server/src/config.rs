@@ -1,3 +1,6 @@
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
+use dotenv::dotenv;
 use opaque_ke::ServerSetup;
 use redis::Client as RedisClient;
 use redis::aio::ConnectionManager;
@@ -7,20 +10,33 @@ use std::sync::Arc;
 
 use secrecy::SecretSlice;
 
-use crate::opaque::{self, OpaqueCiphersuite};
+use crate::opaque::OpaqueCiphersuite;
 
-const SERVER_ADDR: &str = "0.0.0.0:3000";
-
-// TODO: vérifier si ça clone vraiment -> OUI AXUM CLONE L'ETAT POUR CHAQUE REQUETE
-// TODO: ARC -> Permet de ""bypass"" le .clone() et partager la même instance entre les threads
-// Utilisé quand l'objet est "lourd" à cloner et quand on veut une seule instance partagée en mémoire
-// (pour secrets, configs, ...)
 #[derive(Clone)]
 pub struct ServerState {
     pub pool: PgPool,
     pub redis: ConnectionManager,
     pub opaque_setup: Arc<ServerSetup<OpaqueCiphersuite>>,
     pub pepper: Arc<SecretSlice<u8>>,
+}
+
+pub async fn init_server_state() -> ServerState {
+    dotenv().ok();
+
+    let pool = setup_postgres().await;
+
+    let redis = setup_redis().await;
+
+    let pepper = setup_pepper();
+
+    let opaque_setup = setup_opaque();
+
+    ServerState {
+        pool,
+        redis,
+        opaque_setup,
+        pepper,
+    }
 }
 
 async fn setup_postgres() -> PgPool {
@@ -58,23 +74,12 @@ fn setup_pepper() -> Arc<SecretSlice<u8>> {
 }
 
 fn setup_opaque() -> Arc<ServerSetup<OpaqueCiphersuite>> {
-    // TODO :Faire que ca fait "make_server_setup" seulement si il n'existe pas en bdd
-    Arc::new(opaque::make_server_setup())
-}
-
-pub async fn init_server_state() -> ServerState {
-    let pool = setup_postgres().await;
-
-    let redis = setup_redis().await;
-
-    let pepper = setup_pepper();
-
-    let opaque_setup = setup_opaque();
-
-    ServerState {
-        pool,
-        redis,
-        opaque_setup,
-        pepper,
-    }
+    let server_setup_b64 =
+        std::env::var("OPAQUE_SERVER_SETUP").expect("OPAQUE_SERVER_SETUP must be set");
+    let server_setup_bytes = STANDARD
+        .decode(server_setup_b64)
+        .expect("OPAQUE_SERVER_SETUP invalid base64");
+    let server_setup = ServerSetup::<OpaqueCiphersuite>::deserialize(&server_setup_bytes)
+        .expect("Failed to deserialize OPAQUE_SERVER_SETUP");
+    Arc::new(server_setup)
 }

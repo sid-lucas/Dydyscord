@@ -1,14 +1,13 @@
+use crate::config::init_server_state;
 use axum::{
     Router,
     routing::{get, post},
 };
-use dotenv::dotenv;
-use crate::config::init_server_state;
 
+mod config;
 mod database;
 mod handlers;
 mod opaque;
-mod config;
 
 const SERVER_ADDR: &str = "0.0.0.0:3000";
 
@@ -16,9 +15,6 @@ const SERVER_ADDR: &str = "0.0.0.0:3000";
 async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
-
-    // Load .env
-    dotenv().ok();
 
     let server_state = init_server_state().await;
 

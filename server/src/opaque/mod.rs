@@ -14,7 +14,7 @@ impl CipherSuite for OpaqueCiphersuite {
     type Ksf = opaque_ke::ksf::Identity;
 }
 
-pub fn make_server_setup_for_env_file() {
+pub fn _make_server_setup_for_env_file() {
     let mut rng = OsRng;
     let setup = ServerSetup::<OpaqueCiphersuite>::new(&mut rng);
     let setup_b64 = STANDARD.encode(setup.serialize());
