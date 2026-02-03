@@ -77,12 +77,12 @@ fn main() {
         match answer {
             Choice::Register => {
                 if let Err(e) = opaque::register() {
-                    eprintln!("Registration failed: {e}");
+                    eprintln!("Registration failed: {e:?}");
                 }
             }
             Choice::Login => {
                 if let Err(e) = opaque::login() {
-                    eprintln!("Login failed: {e}");
+                    eprintln!("Login failed: {e:?}");
                 }
             }
         }

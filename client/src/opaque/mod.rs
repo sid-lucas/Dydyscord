@@ -22,6 +22,23 @@ pub enum ClientError {
     ApiError(String),
 }
 
+impl From<api::ApiError> for ClientError {
+    fn from(err: api::ApiError) -> Self {
+        match err {
+            api::ApiError::Http { status, message } => {
+                if status == reqwest::StatusCode::CONFLICT {
+                    ClientError::UserExists
+                } else if status == reqwest::StatusCode::UNAUTHORIZED {
+                    ClientError::InvalidCredentials
+                } else {
+                    ClientError::ApiError(format!("{status}: {message}"))
+                }
+            }
+            api::ApiError::Reqwest(e) => ClientError::ApiError(e.to_string()),
+        }
+    }
+}
+
 struct DefaultCipherSuite;
 
 impl CipherSuite for DefaultCipherSuite {
@@ -58,14 +75,8 @@ pub fn register() -> Result<(), ClientError> {
         username: &username,
         start_register_request,
     });
-    let start_register_response = match response {
+    let register_response_b64 = match response {
         Ok(response) => response.start_register_response,
-        Err(e) => return Err(e.into()),
-    };
-
-    println!("{:?}", register_response_b64);
-    let register_response_b64 = match register_response_b64 {
-        Ok(response) => response,
         Err(e) => return Err(e.into()),
     };
 
@@ -93,14 +104,17 @@ pub fn register() -> Result<(), ClientError> {
     let finish_register_request =
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
-    api::opaque_register_finish(RegisterFinishRequest {
+    // Call API (envoi requête et réception réponse)
+    let response = api::opaque_register_finish(RegisterFinishRequest {
         username: &username,
         finish_register_request,
-    })
-    .map_err(|e| e)?;
+    });
+    match response {
+        Ok(response) => println!("{response}"),
+        Err(e) => return Err(e.into()),
+    };
 
-    println!("Registration completed successfully.");
-
+    // TODO : utiliser
     // CA c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
     // Uniquement connue du client.
     let export_key = finish.export_key;
@@ -108,11 +122,11 @@ pub fn register() -> Result<(), ClientError> {
     Ok(())
 }
 
-pub fn login() -> Result<(), Box<dyn Error>> {
+pub fn login() -> Result<(), ClientError> {
     let username = Text::new("Enter your username:").prompt();
     let username = match username {
         Ok(username) => username,
-        Err(_) => return Err("Failed to read username".into()),
+        Err(_) => return Err(ClientError::Input("Failed to read username".into())),
     };
 
     let password = Password::new("Enter your password:")
@@ -120,7 +134,7 @@ pub fn login() -> Result<(), Box<dyn Error>> {
         .prompt();
     let password = match password {
         Ok(password) => password.into_bytes(),
-        Err(_) => return Err("Failed to read password".into()),
+        Err(_) => return Err(ClientError::Input("Failed to read password".into())),
     };
 
     let mut client_rng = OsRng;
@@ -137,12 +151,15 @@ pub fn login() -> Result<(), Box<dyn Error>> {
     let response = api::opaque_login(LoginStartRequest {
         username: &username,
         start_login_request,
-    })
-    .map_err(|e| e)?;
+    });
+    let (login_response_b64, nonce) = match response {
+        Ok(response) => (response.start_login_response, response.nonce),
+        Err(e) => return Err(e.into()),
+    };
 
     // Response base64 -> bytes
     let login_response_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&response.start_login_response)
+        .decode(&login_response_b64)
         .expect("Failed to decode base64 login response");
     // Response désérialisation
     let login_response =
@@ -164,14 +181,17 @@ pub fn login() -> Result<(), Box<dyn Error>> {
     let finish_login_request =
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
-    api::opaque_login_finish(LoginFinishRequest {
+    // Call API (envoi requête et réception réponse)
+    let response = api::opaque_login_finish(LoginFinishRequest {
         finish_login_request,
-        nonce: response.nonce,
-    })
-    .map_err(|e| e)?;
+        nonce,
+    });
+    match response {
+        Ok(response) => println!("{response}"),
+        Err(e) => return Err(e.into()),
+    };
 
-    println!("Login completed successfully.");
-
+    // TODO : utiliser
     // Ca c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
     // Uniquement connue du client.
     let _export_key = finish.export_key;
