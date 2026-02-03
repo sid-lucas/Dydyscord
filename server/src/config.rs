@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use secrecy::SecretSlice;
 
-use crate::opaque::OpaqueCiphersuite;
+use crate::opaque::DefaultCipherSuite as OpaqueCiphersuite;
 
 #[derive(Clone)]
 pub struct ServerState {
