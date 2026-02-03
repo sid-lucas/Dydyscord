@@ -1,5 +1,3 @@
-use core::fmt;
-
 use crate::api;
 use crate::opaque::models::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
@@ -13,9 +11,16 @@ use opaque_ke::{
     ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
 };
 use rand::rngs::OsRng;
-use reqwest::Error as ReqwestError;
 use std::error::Error;
 pub mod models;
+
+#[derive(Debug)]
+pub enum ClientError {
+    Input(String),
+    InvalidCredentials,
+    UserExists,
+    ApiError(String),
+}
 
 struct DefaultCipherSuite;
 
@@ -25,17 +30,17 @@ impl CipherSuite for DefaultCipherSuite {
     type Ksf = Argon2<'static>;
 }
 
-pub fn register() -> Result<(), Box<dyn Error>> {
+pub fn register() -> Result<(), ClientError> {
     let username = Text::new("Enter your username:").prompt();
     let username = match username {
         Ok(username) => username,
-        Err(_) => return Err("Failed to read username".into()),
+        Err(_) => return Err(ClientError::Input("Failed to read username".into())),
     };
 
     let password = Password::new("Enter your password:").prompt();
     let password = match password {
         Ok(password) => password.into_bytes(),
-        Err(_) => return Err("Failed to read password".into()),
+        Err(_) => return Err(ClientError::Input("Failed to read password".into())),
     };
 
     let mut client_rng = OsRng;
@@ -49,10 +54,16 @@ pub fn register() -> Result<(), Box<dyn Error>> {
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
     // Call API (envoi requête et réception réponse)
-    let register_response_b64 = api::opaque_register(RegisterStartRequest {
+    let response = api::opaque_register(RegisterStartRequest {
         username: &username,
         start_register_request,
     });
+    let start_register_response = match response {
+        Ok(response) => response.start_register_response,
+        Err(e) => return Err(e.into()),
+    };
+
+    println!("{:?}", register_response_b64);
     let register_response_b64 = match register_response_b64 {
         Ok(response) => response,
         Err(e) => return Err(e.into()),

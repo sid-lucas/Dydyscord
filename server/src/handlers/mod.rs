@@ -1,5 +1,6 @@
 use axum::http::StatusCode;
 
+mod api_error;
 pub mod auth;
 
 pub async fn root() -> (StatusCode, &'static str) {

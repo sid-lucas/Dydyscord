@@ -1,10 +1,12 @@
 use crate::config::ServerState;
+use crate::handlers::api_error::ApiError;
 use crate::opaque::DefaultCipherSuite as OpaqueCiphersuite;
 use crate::opaque::models::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
     RegisterStartRequest, RegisterStartResponse,
 };
-use axum::{Json, extract::State, http::StatusCode};
+use axum::response::Response;
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use hmac::Mac;
 use opaque_ke::{
@@ -17,6 +19,7 @@ use rand::RngCore;
 use rand::rngs::OsRng;
 use redis::AsyncCommands;
 use secrecy::ExposeSecret;
+use serde::Serialize;
 
 use crate::database::models::User;
 
@@ -34,18 +37,38 @@ fn login_lookup(pepper: &[u8], username: &str) -> Vec<u8> {
 pub async fn register_start(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterStartRequest>,
-) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
+) -> Result<Json<RegisterStartResponse>, ApiError> {
     // Récupération du start_register_request du client et décodage/désérialisation
-    let start_register_request = RegistrationRequest::<OpaqueCiphersuite>::deserialize(
-        &base64::engine::general_purpose::STANDARD
-            .decode(&payload.start_register_request)
-            .map_err(|_| StatusCode::BAD_REQUEST)?,
-    )
-    .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let decoded_request = base64::engine::general_purpose::STANDARD
+        .decode(&payload.start_register_request)
+        .map_err(|e| ApiError::BadRequest((format!("Failed to decode request"))))?;
+    let start_register_request =
+        RegistrationRequest::<OpaqueCiphersuite>::deserialize(&decoded_request)
+            .map_err(|_| ApiError::BadRequest(format!("Failed to deserialize request")))?;
 
     // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
     let username = payload.username;
     let login_lookup = login_lookup(&state.pepper.expose_secret(), &username);
+
+    // Check si l'utilisateur existe déjà dans la BDD
+    let user = sqlx::query_as!(
+        User,
+        r#"
+        SELECT id, login_lookup, opaque_record, created_at, updated_at
+        FROM users
+        WHERE login_lookup = $1
+        "#,
+        login_lookup,
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| ApiError::InternalError)?;
+
+    // Si user existe, erreur :
+    match user {
+        Some(_) => return Err(ApiError::BadRequest("User already exists".to_string())),
+        None => (), // continue normalement
+    }
 
     // Démarrer le register server avec OPAQUE
     let start = ServerRegistration::<OpaqueCiphersuite>::start(
@@ -53,7 +76,7 @@ pub async fn register_start(
         start_register_request,
         login_lookup.as_slice(),
     )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|_| ApiError::InternalError)?;
 
     // Préparation de la request à envoyer au serveur
     let start_register_response =
@@ -63,20 +86,21 @@ pub async fn register_start(
     let response = RegisterStartResponse {
         start_register_response,
     };
-    Ok((StatusCode::OK, Json(response)))
+
+    Ok(Json(response))
 }
 
 pub async fn register_finish(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterFinishRequest>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<Json<String>, ApiError> {
     // Récupération du finish_register_request du client et décodage/désérialisation
-    let finish_register_request = RegistrationUpload::<OpaqueCiphersuite>::deserialize(
-        &base64::engine::general_purpose::STANDARD
-            .decode(&payload.finish_register_request)
-            .map_err(|_| StatusCode::BAD_REQUEST)?,
-    )
-    .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let decoded_request = base64::engine::general_purpose::STANDARD
+        .decode(&payload.finish_register_request)
+        .map_err(|_| ApiError::BadRequest("Failed to decode request".to_string()))?;
+    let finish_register_request =
+        RegistrationUpload::<OpaqueCiphersuite>::deserialize(&decoded_request)
+            .map_err(|_| ApiError::BadRequest("Failed to deserialize request".to_string()))?;
 
     // Finalisation du register en créant le opaque_record à stocker
     let opaque_record = ServerRegistration::finish(finish_register_request)
@@ -97,22 +121,22 @@ pub async fn register_finish(
     )
     .fetch_one(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|_| ApiError::InternalError)?;
 
-    Ok(StatusCode::OK)
+    Ok(Json("Registration successful".to_string()))
 }
 
 pub async fn login_start(
     State(mut state): State<ServerState>,
     Json(payload): Json<LoginStartRequest>,
-) -> Result<(StatusCode, Json<LoginStartResponse>), StatusCode> {
+) -> Result<Json<LoginStartResponse>, ApiError> {
     // Récupération du start_login_request du client et décodage/désérialisation
     let start_login_request = CredentialRequest::<OpaqueCiphersuite>::deserialize(
         &base64::engine::general_purpose::STANDARD
             .decode(&payload.start_login_request)
-            .map_err(|_| StatusCode::BAD_REQUEST)?,
+            .map_err(|_| ApiError::BadRequest("Failed to decode request".to_string()))?,
     )
-    .map_err(|_| StatusCode::BAD_REQUEST)?;
+    .map_err(|_| ApiError::BadRequest("Failed to deserialize request".to_string()))?;
 
     let mut server_rng = OsRng;
 
@@ -133,15 +157,15 @@ pub async fn login_start(
     // fetch_optional pour ne pas révéler l'existence / non-existence d'un user
     .fetch_optional(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|_| ApiError::InternalError)?;
 
     // Désérialisation du opaque_record si user existe
     let opaque_record = match user {
         Some(user) => Some(
             ServerRegistration::<OpaqueCiphersuite>::deserialize(&user.opaque_record)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+                .map_err(|_| ApiError::InternalError)?,
         ),
-        None => None,
+        None => return Err(ApiError::NotFound), // user non trouvé
     };
 
     // Démarrer le login server avec OPAQUE
@@ -153,7 +177,7 @@ pub async fn login_start(
         login_lookup.as_slice(),
         ServerLoginParameters::default(),
     )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|_| ApiError::InternalError)?;
 
     // Génération d'un nonce unique pour retrouver le server_login_state
     let mut nonce = [0u8; 32];
@@ -168,25 +192,22 @@ pub async fn login_start(
         .redis
         .set_ex(&redis_key, state_bytes, ttl_seconds)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| ApiError::InternalError)?;
 
     // Création de la réponse et envoi
     let start_login_response =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
-    Ok((
-        StatusCode::OK,
-        Json(LoginStartResponse {
-            start_login_response,
-            nonce,
-        }),
-    ))
+    Ok(Json(LoginStartResponse {
+        start_login_response,
+        nonce,
+    }))
 }
 
 pub async fn login_finish(
     State(mut state): State<ServerState>,
     Json(payload): Json<LoginFinishRequest>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<Json<String>, ApiError> {
     let redis_key = format!("opaque:login:{}", payload.nonce);
 
     // Récupération du server_login_state depuis Redis
@@ -194,12 +215,12 @@ pub async fn login_finish(
         .redis
         .get(&redis_key)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| ApiError::InternalError)?;
 
     // Si le nonce inconnu / expiré
     let state_bytes: Vec<u8> = match state_bytes {
         Some(v) => v,
-        None => return Err(StatusCode::UNAUTHORIZED),
+        None => return Err(ApiError::Unauthorized),
     };
 
     // Supprimer one-shot (évite replay)
@@ -207,27 +228,26 @@ pub async fn login_finish(
         .redis
         .del(&redis_key)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| ApiError::InternalError)?;
 
     // Décode/Désérialise le message final du client
     let finish_login_request = base64::engine::general_purpose::STANDARD
         .decode(&payload.finish_login_request)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+        .map_err(|_| ApiError::BadRequest("Failed to decode request".to_string()))?;
 
     let finish_login_request =
         CredentialFinalization::<OpaqueCiphersuite>::deserialize(&finish_login_request)
-            .map_err(|_| StatusCode::BAD_REQUEST)?;
-
+            .map_err(|_| ApiError::BadRequest("Failed to deserialize request".to_string()))?;
     // Désérialiser server_login_state puis finish()
     let server_login_state = ServerLogin::<OpaqueCiphersuite>::deserialize(&state_bytes)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| ApiError::InternalError)?;
 
     let finish = server_login_state
         .finish(finish_login_request, ServerLoginParameters::default())
-        .map_err(|_| StatusCode::UNAUTHORIZED)?; // mauvais mdp ou preuve invalide
+        .map_err(|_| ApiError::Unauthorized)?; // mauvais mdp ou preuve invalide
 
     // secret partagé entre le client et le serveur
     let _session_key = finish.session_key;
 
-    Ok(StatusCode::OK)
+    Ok(Json("Login successful".to_string()))
 }
