@@ -118,8 +118,8 @@ pub fn login() -> Result<(), ClientError> {
         .prompt()
         .map_err(|_| ClientError::Input)?;
 
-    // TODO : Faire que l'utilisateur tape une seule fois le mdp
     let password = Password::new("Enter your password:")
+        .without_confirmation()
         .prompt()
         .map_err(|_| ClientError::Input)?
         .into_bytes();
@@ -177,6 +177,7 @@ pub fn login() -> Result<(), ClientError> {
     // Ca c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
     // Uniquement connue du client.
     let _export_key = finish.export_key;
+    
     // Ca c'est le secret partagé entre le client et le serveur
     let _session_key = finish.session_key;
 
