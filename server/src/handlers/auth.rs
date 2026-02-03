@@ -1,4 +1,4 @@
-use crate::ServerState;
+use crate::config::ServerState;
 use crate::opaque::OpaqueCiphersuite;
 use crate::opaque::models::{ 
     RegisterFinishRequest, RegisterStartRequest, RegisterStartResponse,
