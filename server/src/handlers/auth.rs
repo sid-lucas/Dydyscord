@@ -16,6 +16,7 @@ use opaque_ke::{
     ServerLoginParameters, ServerRegistration, ServerRegistrationLen, ServerSetup,
 };
 use redis::AsyncCommands;
+use secrecy::ExposeSecret;
 
 use crate::database::models::User;
 
@@ -46,7 +47,7 @@ pub async fn register_start(
 
     // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
     let username = payload.username;
-    let login_lookup = login_lookup(&state.pepper, &username);
+    let login_lookup = login_lookup(&state.pepper.expose_secret(), &username);
 
     // Démarrer le register server avec OPAQUE
     let start = ServerRegistration::<OpaqueCiphersuite>::start(
@@ -87,7 +88,7 @@ pub async fn register_finish(
     // Récupération du nom d'utilisateur
     let username = payload.username;
     // Recalculer le login_lookup avec le server_pepper et username
-    let login_lookup = login_lookup(&state.pepper, &username);
+    let login_lookup = login_lookup(&state.pepper.expose_secret(), &username);
 
     // Stocker le opaque_record dans la BDD associé au login_lookup
     sqlx::query_as!(
@@ -121,7 +122,7 @@ pub async fn login_start(
     
     // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
     let username = payload.username;
-    let login_lookup = login_lookup(&state.pepper, &username);
+    let login_lookup = login_lookup(&state.pepper.expose_secret(), &username);
 
     // Récupération du user correspondant au login_lookup dans la BDD
     let user = sqlx::query_as!(

@@ -10,6 +10,8 @@ use redis::aio::ConnectionManager;
 use redis::Client as RedisClient;
 use std::sync::Arc;
 
+use secrecy::{SecretSlice};
+
 use crate::opaque::OpaqueCiphersuite;
 
 mod database;
@@ -18,15 +20,16 @@ mod opaque;
 
 const SERVER_ADDR: &str = "0.0.0.0:3000";
 
-// TODO: vérifier si ça clone vraiment
-// TODO: ARC???
+// TODO: vérifier si ça clone vraiment -> OUI AXUM CLONE L'ETAT POUR CHAQUE REQUETE
+// TODO: ARC -> Permet de ""bypass"" le .clone() et partager la même instance entre les threads
+// Utilisé quand l'objet est "lourd" à cloner et quand on veut une seule instance partagée en mémoire
+// (pour secrets, configs, ...)
 #[derive(Clone)]
 pub struct ServerState {
     pub pool: PgPool,
     pub redis: ConnectionManager,
     pub opaque_setup: Arc<ServerSetup<OpaqueCiphersuite>>,
-    pub pepper: [u8; 64], // TODO: Je sais pas si c'est une bonne pratique d'avoir le pepper en mémoire comme ça,
-                          // Ou si on devrait le recup du .env à chaque fois..?
+    pub pepper: Arc<SecretSlice<u8>>,
 }
 
 async fn build_redis(redis_url: &str) -> ConnectionManager {
@@ -60,15 +63,18 @@ async fn main() {
     let redis = build_redis(&redis_url).await;
 
     // Setup pepper
-    let pepper = hex::decode(std::env::var("SERVER_PEPPER").expect("SERVER_PEPPER must be set"))
-        .expect("SERVER_PEPPER invalid hex");
+    let pepper_hex = std::env::var("SERVER_PEPPER").expect("SERVER_PEPPER must be set");
+    let pepper_bytes = hex::decode(pepper_hex).expect("SERVER_PEPPER invalid hex");
+    if pepper_bytes.len() != 64 {
+        panic!("SERVER_PEPPER must be 64 bytes");
+    }
+    let pepper: SecretSlice<u8> = pepper_bytes.into();
 
-    // init état du serveur
     let server_state = ServerState {
         pool,
         redis,
         opaque_setup: Arc::new(opaque::make_server_setup()),
-        pepper: pepper.try_into().expect("SERVER_PEPPER must be 64 bytes"),
+        pepper: Arc::new(pepper),
     };
 
     let app = Router::new()
