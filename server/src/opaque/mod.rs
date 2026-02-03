@@ -1,3 +1,5 @@
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use opaque_ke::CipherSuite;
 use opaque_ke::ServerSetup;
 use rand::rngs::OsRng;
@@ -12,7 +14,10 @@ impl CipherSuite for OpaqueCiphersuite {
     type Ksf = opaque_ke::ksf::Identity;
 }
 
-pub fn make_server_setup() -> ServerSetup<OpaqueCiphersuite> {
+pub fn make_server_setup_for_env_file() {
     let mut rng = OsRng;
-    ServerSetup::<OpaqueCiphersuite>::new(&mut rng) // appelé une seule fois au démarrage du serveur
+    let setup = ServerSetup::<OpaqueCiphersuite>::new(&mut rng);
+    let setup_b64 = STANDARD.encode(setup.serialize());
+
+    println!("{}", setup_b64);
 }
