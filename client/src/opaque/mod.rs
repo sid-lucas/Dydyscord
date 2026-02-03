@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::api;
 use crate::opaque::models::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
@@ -11,31 +13,9 @@ use opaque_ke::{
     ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
 };
 use rand::rngs::OsRng;
-
+use reqwest::Error as ReqwestError;
+use std::error::Error;
 pub mod models;
-
-#[derive(Debug)]
-pub enum ClientError {
-    Input,
-    Api(String),
-    Base64,
-    Opaque,
-    InvalidCredentials,
-}
-
-impl std::fmt::Display for ClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ClientError::Input => write!(f, "input error"),
-            ClientError::Api(s) => write!(f, "api error: {s}"),
-            ClientError::Base64 => write!(f, "invalid base64"),
-            ClientError::Opaque => write!(f, "opaque protocol error"),
-            ClientError::InvalidCredentials => write!(f, "user unknown or invalid credentials"),
-        }
-    }
-}
-
-impl std::error::Error for ClientError {}
 
 struct DefaultCipherSuite;
 
@@ -45,21 +25,24 @@ impl CipherSuite for DefaultCipherSuite {
     type Ksf = Argon2<'static>;
 }
 
-pub fn register() -> Result<(), ClientError> {
-    let username = Text::new("Enter your username:")
-        .prompt()
-        .map_err(|_| ClientError::Input)?;
+pub fn register() -> Result<(), Box<dyn Error>> {
+    let username = Text::new("Enter your username:").prompt();
+    let username = match username {
+        Ok(username) => username,
+        Err(_) => return Err("Failed to read username".into()),
+    };
 
-    let password = Password::new("Enter your password:")
-        .prompt()
-        .map_err(|_| ClientError::Input)?
-        .into_bytes();
+    let password = Password::new("Enter your password:").prompt();
+    let password = match password {
+        Ok(password) => password.into_bytes(),
+        Err(_) => return Err("Failed to read password".into()),
+    };
 
     let mut client_rng = OsRng;
 
     // Démarrer le register client avec OPAQUE
     let start = ClientRegistration::<DefaultCipherSuite>::start(&mut client_rng, &password)
-        .map_err(|_| ClientError::Opaque)?;
+        .expect("Failed to start client registration");
 
     // Préparation de la request à envoyer au serveur
     let start_register_request =
@@ -69,17 +52,20 @@ pub fn register() -> Result<(), ClientError> {
     let register_response_b64 = api::opaque_register(RegisterStartRequest {
         username: &username,
         start_register_request,
-    })
-    .map_err(|e| ClientError::Api(e.to_string()))?;
+    });
+    let register_response_b64 = match register_response_b64 {
+        Ok(response) => response,
+        Err(e) => return Err(e.into()),
+    };
 
     // Response base64 -> bytes
     let register_response_bytes = base64::engine::general_purpose::STANDARD
         .decode(&register_response_b64)
-        .map_err(|_| ClientError::Base64)?;
+        .expect("Failed to decode base64 register response");
     // Response désérialisation
     let register_response =
         RegistrationResponse::<DefaultCipherSuite>::deserialize(&register_response_bytes)
-            .map_err(|_| ClientError::Opaque)?;
+            .expect("Failed to deserialize register response");
 
     // Démarrer le finish avec la réponse du serveur
     let finish = start
@@ -90,7 +76,7 @@ pub fn register() -> Result<(), ClientError> {
             register_response,
             ClientRegistrationFinishParameters::default(),
         )
-        .map_err(|_| ClientError::Opaque)?;
+        .expect("Failed to finish client registration");
 
     // Préparation de la request à envoyer au serveur
     let finish_register_request =
@@ -100,7 +86,7 @@ pub fn register() -> Result<(), ClientError> {
         username: &username,
         finish_register_request,
     })
-    .map_err(|e| ClientError::Api(e.to_string()))?;
+    .map_err(|e| e)?;
 
     println!("Registration completed successfully.");
 
@@ -111,22 +97,26 @@ pub fn register() -> Result<(), ClientError> {
     Ok(())
 }
 
-pub fn login() -> Result<(), ClientError> {
-    let username = Text::new("Enter your username:")
-        .prompt()
-        .map_err(|_| ClientError::Input)?;
+pub fn login() -> Result<(), Box<dyn Error>> {
+    let username = Text::new("Enter your username:").prompt();
+    let username = match username {
+        Ok(username) => username,
+        Err(_) => return Err("Failed to read username".into()),
+    };
 
     let password = Password::new("Enter your password:")
         .without_confirmation()
-        .prompt()
-        .map_err(|_| ClientError::Input)?
-        .into_bytes();
+        .prompt();
+    let password = match password {
+        Ok(password) => password.into_bytes(),
+        Err(_) => return Err("Failed to read password".into()),
+    };
 
     let mut client_rng = OsRng;
 
     // Démarrer le login client avec OPAQUE
     let start = ClientLogin::<DefaultCipherSuite>::start(&mut client_rng, &password)
-        .map_err(|_| ClientError::Opaque)?;
+        .expect("Failed to start client login");
 
     // Préparation de la request à envoyer au serveur
     let start_login_request =
@@ -137,16 +127,16 @@ pub fn login() -> Result<(), ClientError> {
         username: &username,
         start_login_request,
     })
-    .map_err(|e| ClientError::Api(e.to_string()))?;
+    .map_err(|e| e)?;
 
     // Response base64 -> bytes
     let login_response_bytes = base64::engine::general_purpose::STANDARD
         .decode(&response.start_login_response)
-        .map_err(|_| ClientError::Base64)?;
+        .expect("Failed to decode base64 login response");
     // Response désérialisation
     let login_response =
         CredentialResponse::<DefaultCipherSuite>::deserialize(&login_response_bytes)
-            .map_err(|_| ClientError::Opaque)?;
+            .expect("Failed to deserialize login response");
 
     // Finaliser le login avec la réponse du serveur
     let finish = start
@@ -157,7 +147,7 @@ pub fn login() -> Result<(), ClientError> {
             login_response,
             ClientLoginFinishParameters::default(),
         )
-        .map_err(|_| ClientError::InvalidCredentials)?;
+        .expect("Failed to finish client login");
 
     // Préparation de la request à envoyer au serveur
     let finish_login_request =
@@ -167,7 +157,7 @@ pub fn login() -> Result<(), ClientError> {
         finish_login_request,
         nonce: response.nonce,
     })
-    .map_err(|e| ClientError::Api(e.to_string()))?;
+    .map_err(|e| e)?;
 
     println!("Login completed successfully.");
 

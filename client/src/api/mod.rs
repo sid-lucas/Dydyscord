@@ -2,8 +2,6 @@ use crate::opaque::models::{
     RegisterFinishRequest, RegisterStartRequest, RegisterStartResponse,
     LoginStartRequest, LoginStartResponse, LoginFinishRequest
 };
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 
 const SERVER_URL: &str = "http://localhost:3000";
 
