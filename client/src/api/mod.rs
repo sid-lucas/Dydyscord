@@ -20,7 +20,7 @@ pub fn opaque_register(
         .map_err(|_| ClientError::Network)?;
 
     match response.status() {
-        StatusCode::OK => response.json().map_err(|_| ClientError::InvalidResponse),
+        StatusCode::CREATED => response.json().map_err(|_| ClientError::InvalidResponse),
         StatusCode::CONFLICT => Err(ClientError::UsernameTaken),
         StatusCode::BAD_REQUEST => Err(ClientError::BadRequest),
         _ => Err(ClientError::Server),

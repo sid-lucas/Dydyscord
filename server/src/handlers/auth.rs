@@ -32,7 +32,7 @@ fn login_lookup(pepper: &[u8], username: &str) -> Vec<u8> {
 pub async fn register_start(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterStartRequest>,
-) -> Result<Json<RegisterStartResponse>, StatusCode> {
+) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
     // Récupération du start_register_request du client et décodage/désérialisation
     let decoded_request = base64::engine::general_purpose::STANDARD
         .decode(&payload.start_register_request)
@@ -81,7 +81,7 @@ pub async fn register_start(
         start_register_response,
     };
 
-    Ok(Json(response))
+    Ok((StatusCode::CREATED, Json(response)))
 }
 
 pub async fn register_finish(
@@ -121,7 +121,7 @@ pub async fn register_finish(
 pub async fn login_start(
     State(mut state): State<ServerState>,
     Json(payload): Json<LoginStartRequest>,
-) -> Result<Json<LoginStartResponse>, StatusCode> {
+) -> Result<(StatusCode, Json<LoginStartResponse>), StatusCode> {
     // Récupération du start_login_request du client et décodage/désérialisation
     let start_login_request = CredentialRequest::<DCS>::deserialize(
         &base64::engine::general_purpose::STANDARD
@@ -190,10 +190,13 @@ pub async fn login_start(
     let start_login_response =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
-    Ok(Json(LoginStartResponse {
-        start_login_response,
-        nonce,
-    }))
+    Ok((
+        StatusCode::OK,
+        Json(LoginStartResponse {
+            start_login_response,
+            nonce,
+        }),
+    ))
 }
 
 pub async fn login_finish(
