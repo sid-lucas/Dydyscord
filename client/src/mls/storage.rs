@@ -1,5 +1,5 @@
 use std::os::unix::fs::PermissionsExt;
-use std::{fs, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
 pub struct FileBackedStorage {
     path: PathBuf,
@@ -7,8 +7,10 @@ pub struct FileBackedStorage {
 
 fn ensure_storage_path() -> PathBuf {
     // chemin jusqu'au dossier
-    let mut dir = PathBuf::new();
-    dir.push("/home/.dydyscord");
+    let home = env::var("HOME").expect("HOME not set");
+
+    let mut dir = PathBuf::from(home);
+    dir.push(".dydyscord");
 
     // Créer le dossier de l'app si non existant
     if !dir.exists() {
@@ -26,7 +28,7 @@ fn ensure_storage_path() -> PathBuf {
         fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
     }
 
-    dir
+    file
 }
 
 impl FileBackedStorage {
@@ -43,4 +45,12 @@ impl FileBackedStorage {
     fn read_bytes(&self) -> Option<Vec<u8>> {
         fs::read(&self.path).ok()
     }
+}
+
+pub fn test() -> Result<(), ()> {
+    let s = FileBackedStorage::new();
+    s.write_bytes(b"hello");
+    println!("{:?}", s.read_bytes());
+
+    Ok(())
 }

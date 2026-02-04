@@ -9,6 +9,7 @@ mod opaque;
 enum Choice {
     Register,
     Login,
+    Test,
 }
 
 impl fmt::Display for Choice {
@@ -16,6 +17,7 @@ impl fmt::Display for Choice {
         match self {
             Choice::Register => write!(f, "Sign Up"),
             Choice::Login => write!(f, "Log In"),
+            Choice::Test => write!(f, "Test"),
         }
     }
 }
@@ -34,9 +36,14 @@ fn main() {
             Choice::Login => match opaque::auth::login() {
                 Ok(_) => {
                     println!("Login successful!");
-                    
                 }
                 Err(e) => eprintln!("Login failed: {e}"),
+            },
+            Choice::Test => match mls::storage::test() {
+                Ok(_) => {
+                    println!("TEST OK");
+                }
+                Err(e) => eprintln!("TEST PAS OK"),
             },
         }
     }
