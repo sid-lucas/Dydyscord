@@ -1,4 +1,5 @@
 use crate::api;
+use crate::error::ClientError;
 use crate::opaque::models::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
     RegisterStartRequest, RegisterStartResponse,
@@ -12,33 +13,7 @@ use opaque_ke::{
     ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
 };
 use rand::rngs::OsRng;
-
 pub mod models;
-
-#[derive(Debug)]
-pub enum ClientError {
-    Input(String), // TODO : a utiliser (string) mais comment?
-    InvalidCredentials,
-    UserExists,
-    ApiError(String), // TODO : a utiliser (string) mais comment?
-}
-
-impl From<api::ApiError> for ClientError {
-    fn from(err: api::ApiError) -> Self {
-        match err {
-            api::ApiError::Http { status, message } => {
-                if status == reqwest::StatusCode::CONFLICT {
-                    ClientError::UserExists
-                } else if status == reqwest::StatusCode::UNAUTHORIZED {
-                    ClientError::InvalidCredentials
-                } else {
-                    ClientError::ApiError(format!("{status}: {message}"))
-                }
-            }
-            api::ApiError::Reqwest(e) => ClientError::ApiError(e.to_string()),
-        }
-    }
-}
 
 struct DefaultCipherSuite;
 
@@ -49,17 +24,14 @@ impl CipherSuite for DefaultCipherSuite {
 }
 
 pub fn register() -> Result<(), ClientError> {
-    let username = Text::new("Enter your username:").prompt();
-    let username = match username {
-        Ok(username) => username,
-        Err(_) => return Err(ClientError::Input("Failed to read username".into())),
-    };
+    let username = Text::new("Enter your username:")
+        .prompt()
+        .map_err(|_| ClientError::Input)?;
 
-    let password = Password::new("Enter your password:").prompt();
-    let password = match password {
-        Ok(password) => password.into_bytes(),
-        Err(_) => return Err(ClientError::Input("Failed to read password".into())),
-    };
+    let password = Password::new("Enter your password:")
+        .prompt()
+        .map_err(|_| ClientError::Input)?
+        .into_bytes();
 
     let mut client_rng = OsRng;
 
@@ -105,16 +77,11 @@ pub fn register() -> Result<(), ClientError> {
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
     // Call API (envoi requête et réception réponse)
-    let response = api::opaque_register_finish(RegisterFinishRequest {
+    api::opaque_register_finish(RegisterFinishRequest {
         username: &username,
         finish_register_request,
-    });
-    match response {
-        Ok(response) => println!("{response}"),
-        Err(e) => return Err(e.into()),
-    };
-
-    println!("Registration successful!");
+    })
+    .map_err(|e| e.into())?;
 
     // TODO : utiliser
     // CA c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
@@ -125,19 +92,15 @@ pub fn register() -> Result<(), ClientError> {
 }
 
 pub fn login() -> Result<(), ClientError> {
-    let username = Text::new("Enter your username:").prompt();
-    let username = match username {
-        Ok(username) => username,
-        Err(_) => return Err(ClientError::Input("Failed to read username".into())),
-    };
+    let username = Text::new("Enter your username:")
+        .prompt()
+        .map_err(|_| ClientError::Input)?;
 
     let password = Password::new("Enter your password:")
         .without_confirmation()
-        .prompt();
-    let password = match password {
-        Ok(password) => password.into_bytes(),
-        Err(_) => return Err(ClientError::Input("Failed to read password".into())),
-    };
+        .prompt()
+        .map_err(|_| ClientError::Input)?
+        .into_bytes();
 
     let mut client_rng = OsRng;
 
@@ -183,16 +146,11 @@ pub fn login() -> Result<(), ClientError> {
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
     // Call API (envoi requête et réception réponse)
-    let response = api::opaque_login_finish(LoginFinishRequest {
+    api::opaque_login_finish(LoginFinishRequest {
         finish_login_request,
         nonce,
-    });
-    match response {
-        Ok(response) => println!("{response}"),
-        Err(e) => return Err(e.into()),
-    };
-
-    println!("Login successful!");
+    })
+    .map_err(|e| e.into())?;
 
     // TODO : utiliser
     // Ca c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement

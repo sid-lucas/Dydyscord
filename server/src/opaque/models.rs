@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // Register
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct RegisterStartRequest {
     pub username: String,
     pub start_register_request: String, // base64

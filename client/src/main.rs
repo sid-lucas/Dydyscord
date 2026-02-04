@@ -6,6 +6,7 @@ use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use std::fmt;
 mod api;
+mod error;
 mod opaque;
 mod user;
 
@@ -75,16 +76,14 @@ fn main() {
             .expect("An error occurred");
 
         match answer {
-            Choice::Register => {
-                if let Err(e) = opaque::register() {
-                    eprintln!("Registration failed: {e:?}");
-                }
-            }
-            Choice::Login => {
-                if let Err(e) = opaque::login() {
-                    eprintln!("Login failed: {e:?}");
-                }
-            }
+            Choice::Register => match opaque::register() {
+                Ok(_) => println!("Registration successful!"),
+                Err(e) => eprintln!("Registration failed: {e}"),
+            },
+            Choice::Login => match opaque::login() {
+                Ok(_) => println!("Login successful!"),
+                Err(e) => eprintln!("Login failed: {e}"),
+            },
         }
     }
 }

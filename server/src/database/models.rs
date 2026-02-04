@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct User {
@@ -8,10 +8,4 @@ pub struct User {
     pub opaque_record: Vec<u8>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateUserPayload {
-    pub username: String,
-    pub opaque_record: String,
 }

@@ -1,5 +1,5 @@
 # Dydyscord
 
 TODO :
-- Finir la gestion propre des erreurs a tous les niveaux
-- Séparer en modules d'erreur
+- Erreur au moment du login avec username ok mais mdp incorrect
+- Revoir structure des dossiers (trop de mod)
