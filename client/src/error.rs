@@ -20,8 +20,8 @@ pub enum ClientError {
     #[error("bad request sent to server")]
     BadRequest,
 
-    #[error("user not found")]
-    UserNotFound,
+    #[error("username or password is incorrect")]
+    LoginFailed,
 
     #[error("unauthorized access")]
     Unauthorized,

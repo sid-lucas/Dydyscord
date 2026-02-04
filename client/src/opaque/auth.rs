@@ -12,6 +12,7 @@ use opaque_ke::{
     ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
 };
 use rand::rngs::OsRng;
+use std::{thread, time::Duration};
 
 struct DefaultCipherSuite;
 
@@ -110,6 +111,10 @@ pub fn login() -> Result<(), ClientError> {
     let start_login_request =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
+    // Délai aléatoire pour éviter les attaques timing
+    let random_delay = Duration::from_millis(300 + (rand::random::<u64>() % 200));
+    thread::sleep(random_delay);
+
     // Call API (envoi requête et réception réponse)
     let response = api::opaque_login(LoginStartRequest {
         username: &username,
@@ -137,7 +142,7 @@ pub fn login() -> Result<(), ClientError> {
             login_response,
             ClientLoginFinishParameters::default(),
         )
-        .expect("Failed to finish client login");
+        .map_err(|_| ClientError::LoginFailed)?;
 
     // Préparation de la request à envoyer au serveur
     let finish_login_request =

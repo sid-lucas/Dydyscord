@@ -54,7 +54,7 @@ pub fn opaque_login(payload: LoginStartRequest<'_>) -> Result<LoginStartResponse
 
     match response.status() {
         StatusCode::OK => response.json().map_err(|_| ClientError::InvalidResponse),
-        StatusCode::NOT_FOUND => Err(ClientError::UserNotFound),
+        StatusCode::NOT_FOUND => Err(ClientError::LoginFailed),
         StatusCode::BAD_REQUEST => Err(ClientError::BadRequest),
         _ => Err(ClientError::Server),
     }
