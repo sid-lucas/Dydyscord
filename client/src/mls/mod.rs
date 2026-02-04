@@ -2,6 +2,9 @@ use openmls::prelude::{tls_codec::*, *};
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 
+mod storage;
+
+
 // A helper to create and store credentials.
 fn generate_credential_with_key(
     identity: Vec<u8>,
