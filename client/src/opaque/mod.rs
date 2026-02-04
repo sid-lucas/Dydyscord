@@ -3,6 +3,7 @@ use crate::opaque::models::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
     RegisterStartRequest, RegisterStartResponse,
 };
+use DefaultCipherSuite as DCS;
 use base64::Engine;
 use inquire::{Password, Text};
 use opaque_ke::argon2::Argon2;
@@ -11,15 +12,15 @@ use opaque_ke::{
     ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
 };
 use rand::rngs::OsRng;
-use std::error::Error;
+
 pub mod models;
 
 #[derive(Debug)]
 pub enum ClientError {
-    Input(String),
+    Input(String), // TODO : a utiliser (string) mais comment?
     InvalidCredentials,
     UserExists,
-    ApiError(String),
+    ApiError(String), // TODO : a utiliser (string) mais comment?
 }
 
 impl From<api::ApiError> for ClientError {
@@ -63,7 +64,7 @@ pub fn register() -> Result<(), ClientError> {
     let mut client_rng = OsRng;
 
     // Démarrer le register client avec OPAQUE
-    let start = ClientRegistration::<DefaultCipherSuite>::start(&mut client_rng, &password)
+    let start = ClientRegistration::<DCS>::start(&mut client_rng, &password)
         .expect("Failed to start client registration");
 
     // Préparation de la request à envoyer au serveur
@@ -85,9 +86,8 @@ pub fn register() -> Result<(), ClientError> {
         .decode(&register_response_b64)
         .expect("Failed to decode base64 register response");
     // Response désérialisation
-    let register_response =
-        RegistrationResponse::<DefaultCipherSuite>::deserialize(&register_response_bytes)
-            .expect("Failed to deserialize register response");
+    let register_response = RegistrationResponse::<DCS>::deserialize(&register_response_bytes)
+        .expect("Failed to deserialize register response");
 
     // Démarrer le finish avec la réponse du serveur
     let finish = start
@@ -113,6 +113,8 @@ pub fn register() -> Result<(), ClientError> {
         Ok(response) => println!("{response}"),
         Err(e) => return Err(e.into()),
     };
+
+    println!("Registration successful!");
 
     // TODO : utiliser
     // CA c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
@@ -140,7 +142,7 @@ pub fn login() -> Result<(), ClientError> {
     let mut client_rng = OsRng;
 
     // Démarrer le login client avec OPAQUE
-    let start = ClientLogin::<DefaultCipherSuite>::start(&mut client_rng, &password)
+    let start = ClientLogin::<DCS>::start(&mut client_rng, &password)
         .expect("Failed to start client login");
 
     // Préparation de la request à envoyer au serveur
@@ -162,9 +164,8 @@ pub fn login() -> Result<(), ClientError> {
         .decode(&login_response_b64)
         .expect("Failed to decode base64 login response");
     // Response désérialisation
-    let login_response =
-        CredentialResponse::<DefaultCipherSuite>::deserialize(&login_response_bytes)
-            .expect("Failed to deserialize login response");
+    let login_response = CredentialResponse::<DCS>::deserialize(&login_response_bytes)
+        .expect("Failed to deserialize login response");
 
     // Finaliser le login avec la réponse du serveur
     let finish = start
@@ -190,6 +191,8 @@ pub fn login() -> Result<(), ClientError> {
         Ok(response) => println!("{response}"),
         Err(e) => return Err(e.into()),
     };
+
+    println!("Login successful!");
 
     // TODO : utiliser
     // Ca c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement

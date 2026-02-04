@@ -1,4 +1,5 @@
 # Dydyscord
 
 TODO :
-- Gérer proprement les erreurs HTTP
+- Finir la gestion propre des erreurs a tous les niveaux
+- Séparer en modules d'erreur

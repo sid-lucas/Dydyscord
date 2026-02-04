@@ -1,3 +1,4 @@
+use DefaultCipherSuite as DCS;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use opaque_ke::CipherSuite;
@@ -17,7 +18,7 @@ impl CipherSuite for DefaultCipherSuite {
 
 pub fn _make_server_setup_for_env_file() {
     let mut rng = OsRng;
-    let setup = ServerSetup::<DefaultCipherSuite>::new(&mut rng);
+    let setup = ServerSetup::<DCS>::new(&mut rng);
     let setup_b64 = STANDARD.encode(setup.serialize());
 
     println!("{}", setup_b64);

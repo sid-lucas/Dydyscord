@@ -1,6 +1,6 @@
 use crate::config::ServerState;
 use crate::handlers::api_error::ApiError;
-use crate::opaque::DefaultCipherSuite as OpaqueCiphersuite;
+use crate::opaque::DefaultCipherSuite as DCS;
 use crate::opaque::models::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
     RegisterStartRequest, RegisterStartResponse,
@@ -42,9 +42,8 @@ pub async fn register_start(
     let decoded_request = base64::engine::general_purpose::STANDARD
         .decode(&payload.start_register_request)
         .map_err(|e| ApiError::BadRequest((format!("Failed to decode request"))))?;
-    let start_register_request =
-        RegistrationRequest::<OpaqueCiphersuite>::deserialize(&decoded_request)
-            .map_err(|_| ApiError::BadRequest(format!("Failed to deserialize request")))?;
+    let start_register_request = RegistrationRequest::<DCS>::deserialize(&decoded_request)
+        .map_err(|_| ApiError::BadRequest(format!("Failed to deserialize request")))?;
 
     // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
     let username = payload.username;
@@ -71,7 +70,7 @@ pub async fn register_start(
     }
 
     // Démarrer le register server avec OPAQUE
-    let start = ServerRegistration::<OpaqueCiphersuite>::start(
+    let start = ServerRegistration::<DCS>::start(
         &state.opaque_setup,
         start_register_request,
         login_lookup.as_slice(),
@@ -98,9 +97,8 @@ pub async fn register_finish(
     let decoded_request = base64::engine::general_purpose::STANDARD
         .decode(&payload.finish_register_request)
         .map_err(|_| ApiError::BadRequest("Failed to decode request".to_string()))?;
-    let finish_register_request =
-        RegistrationUpload::<OpaqueCiphersuite>::deserialize(&decoded_request)
-            .map_err(|_| ApiError::BadRequest("Failed to deserialize request".to_string()))?;
+    let finish_register_request = RegistrationUpload::<DCS>::deserialize(&decoded_request)
+        .map_err(|_| ApiError::BadRequest("Failed to deserialize request".to_string()))?;
 
     // Finalisation du register en créant le opaque_record à stocker
     let opaque_record = ServerRegistration::finish(finish_register_request)
@@ -131,7 +129,7 @@ pub async fn login_start(
     Json(payload): Json<LoginStartRequest>,
 ) -> Result<Json<LoginStartResponse>, ApiError> {
     // Récupération du start_login_request du client et décodage/désérialisation
-    let start_login_request = CredentialRequest::<OpaqueCiphersuite>::deserialize(
+    let start_login_request = CredentialRequest::<DCS>::deserialize(
         &base64::engine::general_purpose::STANDARD
             .decode(&payload.start_login_request)
             .map_err(|_| ApiError::BadRequest("Failed to decode request".to_string()))?,
@@ -162,7 +160,7 @@ pub async fn login_start(
     // Désérialisation du opaque_record si user existe
     let opaque_record = match user {
         Some(user) => Some(
-            ServerRegistration::<OpaqueCiphersuite>::deserialize(&user.opaque_record)
+            ServerRegistration::<DCS>::deserialize(&user.opaque_record)
                 .map_err(|_| ApiError::InternalError)?,
         ),
         None => return Err(ApiError::NotFound), // user non trouvé
@@ -235,12 +233,11 @@ pub async fn login_finish(
         .decode(&payload.finish_login_request)
         .map_err(|_| ApiError::BadRequest("Failed to decode request".to_string()))?;
 
-    let finish_login_request =
-        CredentialFinalization::<OpaqueCiphersuite>::deserialize(&finish_login_request)
-            .map_err(|_| ApiError::BadRequest("Failed to deserialize request".to_string()))?;
+    let finish_login_request = CredentialFinalization::<DCS>::deserialize(&finish_login_request)
+        .map_err(|_| ApiError::BadRequest("Failed to deserialize request".to_string()))?;
     // Désérialiser server_login_state puis finish()
-    let server_login_state = ServerLogin::<OpaqueCiphersuite>::deserialize(&state_bytes)
-        .map_err(|_| ApiError::InternalError)?;
+    let server_login_state =
+        ServerLogin::<DCS>::deserialize(&state_bytes).map_err(|_| ApiError::InternalError)?;
 
     let finish = server_login_state
         .finish(finish_login_request, ServerLoginParameters::default())
