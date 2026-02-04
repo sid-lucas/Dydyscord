@@ -1,5 +1,3 @@
-use crate::user::User;
-use inquire::{InquireError, Password, Select, Text};
 use inquire_derive::Selectable;
 use openmls::prelude::{tls_codec::*, *};
 use openmls_basic_credential::SignatureKeyPair;
@@ -8,7 +6,6 @@ use std::fmt;
 mod api;
 mod error;
 mod opaque;
-mod user;
 
 // A helper to create and store credentials.
 fn generate_credential_with_key(
@@ -76,11 +73,11 @@ fn main() {
             .expect("An error occurred");
 
         match answer {
-            Choice::Register => match opaque::register() {
+            Choice::Register => match opaque::auth::register() {
                 Ok(_) => println!("Registration successful!"),
                 Err(e) => eprintln!("Registration failed: {e}"),
             },
-            Choice::Login => match opaque::login() {
+            Choice::Login => match opaque::auth::login() {
                 Ok(_) => println!("Login successful!"),
                 Err(e) => eprintln!("Login failed: {e}"),
             },
