@@ -1,10 +1,39 @@
 use openmls::prelude::{tls_codec::*, *};
 use openmls_basic_credential::SignatureKeyPair;
-use openmls_rust_crypto::OpenMlsRustCrypto;
+use openmls_rust_crypto::{OpenMlsRustCrypto, RustCrypto};
+use openmls_sqlite_storage::{Connection, SqliteStorageProvider};
+use openmls_traits::OpenMlsProvider;
 
+use crate::mls::storage::EncryptedCodec;
+
+mod crypto;
 pub mod storage;
+pub mod test;
+
+struct MyProvider {
+    crypto: RustCrypto,
+    rand: RustCrypto,
+    storage: SqliteStorageProvider<EncryptedCodec, Connection>,
+}
+
+impl OpenMlsProvider for MyProvider {
+    type CryptoProvider = RustCrypto;
+    type RandProvider = RustCrypto;
+    type StorageProvider = SqliteStorageProvider<EncryptedCodec, Connection>;
+
+    fn storage(&self) -> &Self::StorageProvider {
+        &self.storage
+    }
+    fn crypto(&self) -> &Self::CryptoProvider {
+        &self.crypto
+    }
+    fn rand(&self) -> &Self::RandProvider {
+        &self.rand
+    }
+}
 
 // A helper to create and store credentials.
+/*
 fn generate_credential_with_key(
     identity: Vec<u8>,
     credential_type: CredentialType,
@@ -29,8 +58,10 @@ fn generate_credential_with_key(
         signature_keys,
     )
 }
+     */
 
 // A helper to create key package bundles.
+/*
 fn generate_key_package(
     ciphersuite: Ciphersuite,
     provider: &impl OpenMlsProvider,
@@ -42,3 +73,4 @@ fn generate_key_package(
         .build(ciphersuite, provider, signer, credential_with_key)
         .unwrap()
 }
+        */

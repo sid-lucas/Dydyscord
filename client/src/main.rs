@@ -39,11 +39,11 @@ fn main() {
                 }
                 Err(e) => eprintln!("Login failed: {e}"),
             },
-            Choice::Test => match mls::storage::test() {
+            Choice::Test => match mls::test::test() {
                 Ok(_) => {
                     println!("TEST OK");
                 }
-                Err(e) => eprintln!("TEST PAS OK"),
+                Err(e) => eprintln!("TEST PAS OK: {e}"),
             },
         }
     }
