@@ -4,7 +4,7 @@ use openmls_rust_crypto::{OpenMlsRustCrypto, RustCrypto};
 use openmls_sqlite_storage::{Connection, SqliteStorageProvider};
 use openmls_traits::OpenMlsProvider;
 
-use crate::mls::storage::EncryptedCodec;
+use crate::mls::storage::{CBORCodec, EncryptedCodec};
 
 mod crypto;
 pub mod storage;
@@ -13,13 +13,13 @@ pub mod test;
 struct MyProvider {
     crypto: RustCrypto,
     rand: RustCrypto,
-    storage: SqliteStorageProvider<EncryptedCodec, Connection>,
+    storage: SqliteStorageProvider<CBORCodec, Connection>,
 }
 
 impl OpenMlsProvider for MyProvider {
     type CryptoProvider = RustCrypto;
     type RandProvider = RustCrypto;
-    type StorageProvider = SqliteStorageProvider<EncryptedCodec, Connection>;
+    type StorageProvider = SqliteStorageProvider<CBORCodec, Connection>;
 
     fn storage(&self) -> &Self::StorageProvider {
         &self.storage

@@ -8,22 +8,22 @@ use once_cell::sync::OnceCell;
 // static mut : ne serait pas safe / risque de race condition
 // var globale avec mutex : lourd et inutile si valeur change pas
 // stocker dans EncryptedCodec : impossible car Codec impose fonctions statiques
-static EXPORT_KEY: OnceCell<[u8; 32]> = OnceCell::new();
+static TEMP_KEY: OnceCell<[u8; 32]> = OnceCell::new();
 
-pub fn init_codec_key(key: [u8; 32]) {
-    let _ = EXPORT_KEY.set(key);
+fn init_codec_key(key: [u8; 32]) {
+    let _ = TEMP_KEY.set(key);
 }
 
 pub fn encrypt_aes_gcm(plaintext: &[u8]) -> Result<Vec<u8>, ()> {
-    // Conversion de l'export_key
-    let k = EXPORT_KEY.get().ok_or(())?;
+    // Conversion de l'TEMP_KEY
+    let k = TEMP_KEY.get().ok_or(())?;
     let key: &Key<Aes256Gcm> = k.into();
 
     // Création du nonce aléatoire
     let mut rng = OsRng;
     let nonce = Aes256Gcm::generate_nonce(&mut rng);
 
-    // Chiffrement avec la export_key
+    // Chiffrement avec la TEMP_KEY
     let cipher = Aes256Gcm::new(key);
     let ciphertext = cipher.encrypt(&nonce, plaintext).map_err(|_| ())?;
 
@@ -51,7 +51,7 @@ pub fn decrypt_aes_gcm(envelope: &[u8]) -> Result<Vec<u8>, ()> {
     let ciphertext = &envelope[13..];
 
     // Récupération de la clé
-    let k = EXPORT_KEY.get().ok_or(())?;
+    let k = TEMP_KEY.get().ok_or(())?;
     let key: &Key<Aes256Gcm> = k.into();
 
     // Création cipher
