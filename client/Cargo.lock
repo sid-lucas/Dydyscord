@@ -270,6 +270,7 @@ dependencies = [
  "ciborium",
  "inquire",
  "inquire-derive",
+ "keyring",
  "once_cell",
  "opaque-ke",
  "openmls",
@@ -1349,6 +1350,16 @@ checksum = "f6e3919bbaa2945715f0bb6d3934a173d1e9a59ac23767fbaaef277265a7411b"
 dependencies = [
  "cfg-if",
  "elliptic-curve",
+]
+
+[[package]]
+name = "keyring"
+version = "3.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eebcc3aff044e5944a8fbaf69eb277d11986064cba30c468730e8b9909fb551c"
+dependencies = [
+ "log",
+ "zeroize",
 ]
 
 [[package]]

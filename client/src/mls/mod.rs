@@ -4,7 +4,7 @@ use openmls_rust_crypto::{OpenMlsRustCrypto, RustCrypto};
 use openmls_sqlite_storage::{Connection, SqliteStorageProvider};
 use openmls_traits::OpenMlsProvider;
 
-use crate::mls::storage::{CBORCodec, EncryptedCodec};
+use crate::mls::storage::CBORCodec;
 
 mod crypto;
 pub mod storage;

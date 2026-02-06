@@ -6,7 +6,7 @@ use openmls_sqlite_storage::{Connection, SqliteStorageProvider};
 use openmls_traits::OpenMlsProvider;
 use openmls_traits::storage::StorageProvider;
 
-use crate::mls::storage::{CBORCodec, EncryptedCodec};
+use crate::mls::storage::CBORCodec;
 use crate::mls::{MyProvider, crypto, storage};
 
 use once_cell::sync::OnceCell;

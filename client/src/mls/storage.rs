@@ -15,42 +15,6 @@ pub enum CodecError {
     Crypto,
 }
 
-pub struct EncryptedCodec;
-
-impl Default for EncryptedCodec {
-    fn default() -> Self {
-        Self
-    }
-}
-
-// TODO, je crois qu'il faut adapter les map_err en utilisant l'enum CodecError
-impl openmls_sqlite_storage::Codec for EncryptedCodec {
-    type Error = CodecError;
-
-    fn to_vec<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, Self::Error> {
-        // Serialize en bytes avec ciborium
-        let mut serialized = Vec::new();
-        ciborium::ser::into_writer(value, &mut serialized).map_err(|_| CodecError::Serde)?;
-
-        // Chiffre les bytes avec export_key de opaque
-        let envelope =
-            crypto::encrypt_aes_gcm(serialized.as_slice()).map_err(|_| CodecError::Crypto)?;
-
-        Ok(envelope)
-    }
-
-    fn from_slice<T: serde::de::DeserializeOwned>(slice: &[u8]) -> Result<T, Self::Error> {
-        // Déchiffre les bytes avec export_key de opaque
-        let plaintext = crypto::decrypt_aes_gcm(slice).map_err(|_| CodecError::Crypto)?;
-
-        // Deserialize avec ciborium
-        let value =
-            ciborium::de::from_reader(plaintext.as_slice()).map_err(|_| CodecError::Serde)?;
-
-        Ok(value)
-    }
-}
-
 pub struct CBORCodec;
 
 impl Default for CBORCodec {

@@ -14,17 +14,27 @@ fn init_codec_key(key: [u8; 32]) {
     let _ = TEMP_KEY.set(key);
 }
 
-pub fn encrypt_aes_gcm(plaintext: &[u8]) -> Result<Vec<u8>, ()> {
-    // Conversion de l'TEMP_KEY
-    let k = TEMP_KEY.get().ok_or(())?;
-    let key: &Key<Aes256Gcm> = k.into();
+pub fn wrap_db_key(export_key: &[u8; 32], db_key: &[u8; 32]) -> Result<Vec<u8>, ()> {
+    encrypt_with_key(export_key, db_key)
+}
 
+pub fn unwrap_db_key(export_key: &[u8; 32], wrapped: &[u8]) -> Result<[u8; 32], ()> {
+    let plain = decrypt_with_key(export_key, wrapped)?;
+    if plain.len() != 32 {
+        return Err(());
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&plain);
+    Ok(out)
+}
+
+pub fn encrypt_with_key(key_bytes: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>, ()> {
     // Création du nonce aléatoire
     let mut rng = OsRng;
     let nonce = Aes256Gcm::generate_nonce(&mut rng);
 
     // Chiffrement avec la TEMP_KEY
-    let cipher = Aes256Gcm::new(key);
+    let cipher = Aes256Gcm::new(key_bytes.into());
     let ciphertext = cipher.encrypt(&nonce, plaintext).map_err(|_| ())?;
 
     // envelope: version || nonce || ciphertext (tag inclus dans ct)
@@ -35,7 +45,7 @@ pub fn encrypt_aes_gcm(plaintext: &[u8]) -> Result<Vec<u8>, ()> {
     Ok(out)
 }
 
-pub fn decrypt_aes_gcm(envelope: &[u8]) -> Result<Vec<u8>, ()> {
+pub fn decrypt_with_key(key_bytes: &[u8; 32], envelope: &[u8]) -> Result<Vec<u8>, ()> {
     // Vérification taille minimale
     if envelope.len() < 1 + 12 {
         return Err(());
@@ -50,12 +60,8 @@ pub fn decrypt_aes_gcm(envelope: &[u8]) -> Result<Vec<u8>, ()> {
     let nonce_bytes = &envelope[1..13];
     let ciphertext = &envelope[13..];
 
-    // Récupération de la clé
-    let k = TEMP_KEY.get().ok_or(())?;
-    let key: &Key<Aes256Gcm> = k.into();
-
     // Création cipher
-    let cipher = Aes256Gcm::new(key);
+    let cipher = Aes256Gcm::new(key_bytes.into());
 
     // Déchiffrement
     let nonce = Nonce::from_slice(nonce_bytes);

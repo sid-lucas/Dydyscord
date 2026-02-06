@@ -25,3 +25,4 @@ once_cell = "1.21.3"
 rusqlite = { version = "0.32.1", features = [
     "bundled-sqlcipher-vendored-openssl",
 ] }
+keyring = "3.6.3"
