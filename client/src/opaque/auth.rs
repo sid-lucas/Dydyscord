@@ -13,6 +13,7 @@ use opaque_ke::{
 };
 use rand::rngs::OsRng;
 use std::{thread, time::Duration};
+use uuid::Uuid;
 
 struct DefaultCipherSuite;
 
@@ -23,7 +24,7 @@ impl CipherSuite for DefaultCipherSuite {
 }
 
 pub struct LoginResult {
-    pub id: i32,
+    pub id: Uuid,
     pub export_key: Vec<u8>,
     pub session_key: Vec<u8>,
 }

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 // Register
 
@@ -31,7 +32,7 @@ pub struct LoginStartRequest<'a> {
 pub struct LoginStartResponse {
     pub start_login_response: String, // base64
     pub nonce: String,                // clé-valeur pour retrouver le server_login_state
-    pub user_id: i32,
+    pub user_id: Uuid,
 }
 
 #[derive(Serialize)]
