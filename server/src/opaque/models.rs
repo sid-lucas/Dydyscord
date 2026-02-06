@@ -31,6 +31,7 @@ pub struct LoginStartRequest {
 pub struct LoginStartResponse {
     pub start_login_response: String, // base64
     pub nonce: String,                // clé-valeur pour retrouver le server_login_state
+    pub user_id: i32,
 }
 
 #[derive(Deserialize)]

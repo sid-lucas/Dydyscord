@@ -22,6 +22,12 @@ impl CipherSuite for DefaultCipherSuite {
     type Ksf = Argon2<'static>;
 }
 
+pub struct LoginResult {
+    pub id: i32,
+    pub export_key: Vec<u8>,
+    pub session_key: Vec<u8>,
+}
+
 pub fn register() -> Result<(), ClientError> {
     let username = Text::new("Enter your username:")
         .prompt()
@@ -90,7 +96,7 @@ pub fn register() -> Result<(), ClientError> {
     Ok(())
 }
 
-pub fn login() -> Result<(), ClientError> {
+pub fn login() -> Result<LoginResult, ClientError> {
     let username = Text::new("Enter your username:")
         .prompt()
         .map_err(|_| ClientError::Input)?;
@@ -120,8 +126,12 @@ pub fn login() -> Result<(), ClientError> {
         username: &username,
         start_login_request,
     });
-    let (login_response_b64, nonce) = match response {
-        Ok(response) => (response.start_login_response, response.nonce),
+    let (login_response_b64, nonce, id) = match response {
+        Ok(response) => (
+            response.start_login_response,
+            response.nonce,
+            response.user_id,
+        ),
         Err(e) => return Err(e.into()),
     };
 
@@ -155,13 +165,9 @@ pub fn login() -> Result<(), ClientError> {
     })
     .map_err(|e| e.into())?;
 
-    // TODO : utiliser
-    // Ca c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
-    // Uniquement connue du client.
-    let _export_key = finish.export_key;
-
-    // Ca c'est le secret partagé entre le client et le serveur
-    let _session_key = finish.session_key;
-
-    Ok(())
+    Ok(LoginResult {
+        id,
+        export_key: finish.export_key.to_vec(),
+        session_key: finish.session_key.to_vec(),
+    })
 }

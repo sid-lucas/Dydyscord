@@ -152,12 +152,13 @@ pub async fn login_start(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Désérialisation du opaque_record si user existe
-    let opaque_record = match user {
-        Some(user) => Some(
-            ServerRegistration::<DCS>::deserialize(&user.opaque_record)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-        ),
-        None => return Err(StatusCode::NOT_FOUND), // user non trouvé
+    let (opaque_record, user_id) = match user {
+        Some(user) => {
+            let opaque_record = ServerRegistration::<DCS>::deserialize(&user.opaque_record)
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            (Some(opaque_record), user.id)
+        }
+        None => return Err(StatusCode::NOT_FOUND),
     };
 
     // Démarrer le login server avec OPAQUE
@@ -195,6 +196,7 @@ pub async fn login_start(
         Json(LoginStartResponse {
             start_login_response,
             nonce,
+            user_id,
         }),
     ))
 }

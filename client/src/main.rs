@@ -4,6 +4,7 @@ mod api;
 mod error;
 mod mls;
 mod opaque;
+mod session;
 
 #[derive(Debug, Copy, Clone, Selectable)]
 enum Choice {
@@ -33,7 +34,7 @@ fn main() {
                 Ok(_) => println!("Registration successful!"),
                 Err(e) => eprintln!("Registration failed: {e}"),
             },
-            Choice::Login => match opaque::auth::login() {
+            Choice::Login => match session::login() {
                 Ok(_) => {
                     println!("Login successful!");
                 }
