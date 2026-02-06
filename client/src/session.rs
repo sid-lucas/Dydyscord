@@ -25,15 +25,23 @@ impl Session {
         }
     }
 
-    pub fn set_provider(&mut self, db_key: &[u8; 32]) {
-        // TODO : Voir si faut pas faire de gestion d'erreur au lieu du unwrap.
-        self.provider = Some(mls::prepare_provider(db_key).unwrap());
+    pub fn set_provider(&mut self, db_key: &[u8; 32]) -> Result<(), ClientError> {
+        self.provider = Some(mls::prepare_provider(db_key)?);
+        Ok(())
     }
 }
 
 pub fn device_exists(user_id: &str) -> bool {
     let has_key = storage::db_key_exists(user_id);
     let has_db = storage::db_exists();
+
+    // Si db présente mais pas la db_key -> considère la db comme corrompue/perdue donc purge
+    if has_db && !has_key {
+        let _ = storage::purge_db();
+    }
+    //TODO : Print de debug
+    println!("has_key : {}", has_key);
+    println!("has_db : {}", has_db);
 
     has_key && has_db
 }

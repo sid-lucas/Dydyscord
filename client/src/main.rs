@@ -74,7 +74,8 @@ fn run() -> Result<(), error::ClientError> {
                             let mut session = Session::new(login_result);
 
                             // Récupère info si c'est un nouveau device avant potentielle initialisation de la db
-                            let new_device = session::device_exists(&session.user_id.to_string());
+                            let new_device = !session::device_exists(&session.user_id.to_string());
+                            println!("new device ? {}", new_device);
 
                             // Récupèration/Création de la clé de chiffrement de la db
                             let db_key = get_or_create_db_key(
@@ -84,7 +85,7 @@ fn run() -> Result<(), error::ClientError> {
                             .unwrap();
 
                             // Ouverture de la connexion de la db et préparation du provider OpenMLS
-                            session.set_provider(&db_key);
+                            session.set_provider(&db_key)?;
 
                             if new_device {
                                 // Faire appel au serveur genre /create/device

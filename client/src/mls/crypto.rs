@@ -1,19 +1,31 @@
 use aes_gcm::{
-    Aes256Gcm, Key, Nonce,
+    Aes256Gcm, Nonce,
     aead::{Aead, AeadCore, KeyInit, OsRng},
 };
+use hkdf::Hkdf;
+use sha2::Sha256;
 
-pub fn wrap_db_key(export_key: &[u8; 32], db_key: &[u8; 32]) -> Result<Vec<u8>, ()> {
-    encrypt_with_key(export_key, db_key)
+pub fn wrap_db_key(export_key: &[u8], db_key: &[u8; 32]) -> Result<Vec<u8>, ()> {
+    let wrap_key = derive_wrap_key(export_key)?;
+    encrypt_with_key(&wrap_key, db_key)
 }
 
-pub fn unwrap_db_key(export_key: &[u8; 32], wrapped: &[u8]) -> Result<[u8; 32], ()> {
-    let plain = decrypt_with_key(export_key, wrapped)?;
+pub fn unwrap_db_key(export_key: &[u8], wrapped: &[u8]) -> Result<[u8; 32], ()> {
+    let wrap_key = derive_wrap_key(export_key)?;
+    let plain = decrypt_with_key(&wrap_key, wrapped)?;
     if plain.len() != 32 {
         return Err(());
     }
     let mut out = [0u8; 32];
     out.copy_from_slice(&plain);
+    Ok(out)
+}
+
+fn derive_wrap_key(export_key: &[u8]) -> Result<[u8; 32], ()> {
+    // TODO : Vérifier... dériver wrap_key avec export_key pcq export_key fait 64bytes et il faut une clé de 32bytes pour chiffrer db_key
+    let hk = Hkdf::<Sha256>::new(None, export_key);
+    let mut out = [0u8; 32];
+    hk.expand(b"db-key-wrap", &mut out).map_err(|_| ())?;
     Ok(out)
 }
 

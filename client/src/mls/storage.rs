@@ -93,11 +93,15 @@ pub fn db_key_exists(user_id: &str) -> bool {
         .is_ok()
 }
 
+pub fn purge_db() {
+    // TODO : Attention, pas de gestion d'erreur ici
+    let db_path = ensure_db();
+    fs::remove_file(&db_path).expect("device.db not found.");
+}
+
 pub fn get_or_create_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], ClientError> {
     let account = user_id.to_string();
     let entry = keyring::Entry::new("dydyscord", &account).map_err(|_| ClientError::Keyring)?;
-
-    let export_key: &[u8; 32] = export_key.try_into().map_err(|_| ClientError::Internal)?;
 
     // Essayer de récupérer la db_key si existe dans la keychain
     if let Ok(wrapped_b64) = entry.get_password() {
