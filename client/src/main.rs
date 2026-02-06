@@ -1,7 +1,6 @@
 use inquire_derive::Selectable;
 use std::fmt;
 
-use crate::opaque::auth::login;
 use crate::session::Session;
 
 mod api;
@@ -34,24 +33,27 @@ impl fmt::Display for LoggedOutChoice {
 
 #[derive(Debug, Copy, Clone, Selectable)]
 enum LoggedInChoice {
-    Logout,
     Test,
+    Logout,
 }
 
 impl fmt::Display for LoggedInChoice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            LoggedInChoice::Logout => write!(f, "Log Out"),
             LoggedInChoice::Test => write!(f, "Test"),
+            LoggedInChoice::Logout => write!(f, "Log Out"),
         }
     }
 }
+
+// TODO : faire un fichier contenant tout les variables const (notamment celle récup du .env)
+// TODO : et peut etre utiliser OnceCell sur ces variables... a discuter
 
 // TODO : PEUT ETRE SEPARER TOUT CA DANS UN FICHIER cli.rs ET JUSTE GARDER LE MAIN() ET LES MOD
 
 fn main() {
     if let Err(e) = run() {
-        eprintln!("Erreur: {e}");
+        eprintln!("Error: {e}");
     }
 }
 
@@ -66,20 +68,40 @@ fn run() -> Result<(), error::ClientError> {
                     .expect("An error occurred");
 
                 match choice {
-                    LoggedOutChoice::Login => {
-                        let login_result = opaque::auth::login();
-                        match login_result {
-                            Ok(_) => {
-                                println!("Login successful!");
+                    LoggedOutChoice::Login => match opaque::auth::login() {
+                        Ok(login_result) => {
+                            // OPAQUE
+                            let session = Session::new(login_result);
+
+                            // OpenMLS
+                            if session::device_exists(
+                                &session.user_id.to_string(),
+                                &session.device_id,
+                            ) {
+                                // Faire appel au serveur genre /create/device
+                                // pour créer un nouveau device dans la bdd lié à l'utilisateur loggé
+                                // et retourner "device_id" à l'utilisateur
+                                // device_id servira à stocker la db_key dans le keystore
+                                // device_id sera aussi présent dans device.db du client (normalement)
+                            } else {
+                                //
+                                // La c'est si le device est reconnu (a deja fait l'initialisation OpenMLS)
                             }
-                            Err(e) => eprintln!("Login failed: {e}"),
+
+                            println!("Login successful!");
+                            appstate = Appstate::LoggedIn(session);
                         }
-                        //let session = Session::new(login_result)?;
-                        //appstate = Appstate::LoggedIn(session);
-                    }
+                        Err(e) => {
+                            eprintln!("Login failed: {e}");
+                            continue;
+                        }
+                    },
                     LoggedOutChoice::Signup => match opaque::auth::register() {
                         Ok(_) => println!("Registration successful!"),
-                        Err(e) => eprintln!("Registration failed: {e}"),
+                        Err(e) => {
+                            eprintln!("Registration failed: {e}");
+                            continue;
+                        }
                     },
                     LoggedOutChoice::Quit => break,
                 }
@@ -90,14 +112,14 @@ fn run() -> Result<(), error::ClientError> {
                     .expect("An error occurred");
 
                 match choice {
+                    LoggedInChoice::Test => {
+                        // utiliser session ici
+                        println!("test");
+                    }
                     LoggedInChoice::Logout => {
                         // TODO CLEAR session
                         println!("need to clear the actual session then proceed.");
                         appstate = Appstate::LoggedOut;
-                    }
-                    LoggedInChoice::Test => {
-                        // utiliser session ici
-                        println!("test");
                     }
                 }
             }

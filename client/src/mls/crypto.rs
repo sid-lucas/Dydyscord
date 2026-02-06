@@ -2,17 +2,6 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
     aead::{Aead, AeadCore, KeyInit, OsRng},
 };
-use once_cell::sync::OnceCell;
-
-// OnceCell car permet de définir une valeur global initialisée unde fois et accessible partout en lecture
-// static mut : ne serait pas safe / risque de race condition
-// var globale avec mutex : lourd et inutile si valeur change pas
-// stocker dans EncryptedCodec : impossible car Codec impose fonctions statiques
-static TEMP_KEY: OnceCell<[u8; 32]> = OnceCell::new();
-
-fn init_codec_key(key: [u8; 32]) {
-    let _ = TEMP_KEY.set(key);
-}
 
 pub fn wrap_db_key(export_key: &[u8; 32], db_key: &[u8; 32]) -> Result<Vec<u8>, ()> {
     encrypt_with_key(export_key, db_key)

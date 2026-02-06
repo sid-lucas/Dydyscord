@@ -17,14 +17,14 @@ use once_cell::sync::OnceCell;
 // stocker dans EncryptedCodec : impossible car Codec impose fonctions statiques
 static EXPORT_KEY: OnceCell<[u8; 32]> = OnceCell::new();
 
-pub fn init_codec_key(key: [u8; 32]) {
+fn init_codec_key(key: [u8; 32]) {
     let _ = EXPORT_KEY.set(key);
 }
 
-pub fn test() -> Result<(), String> {
+fn test() -> Result<(), String> {
     init_codec_key([42u8; 32]); // Clé fixe pour test
 
-    let db_path = storage::ensure_localdb_path();
+    let db_path = storage::ensure_db();
     let conn = Connection::open(db_path).map_err(|e| format!("open db: {e:?}"))?;
 
     let key_bytes = EXPORT_KEY.get().ok_or("export key not set")?;

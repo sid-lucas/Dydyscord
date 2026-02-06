@@ -1,7 +1,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::{env, fs, path::PathBuf};
 
-use crate::mls::crypto;
+use crate::error::ClientError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CodecError {
@@ -14,6 +14,9 @@ pub enum CodecError {
     #[error("crypto error")]
     Crypto,
 }
+
+const APP_FOLDER: &str = ".dydyscord";
+const DB_FILE: &str = "device.db";
 
 pub struct CBORCodec;
 
@@ -37,21 +40,41 @@ impl openmls_sqlite_storage::Codec for CBORCodec {
     }
 }
 
-pub fn ensure_localdb_path() -> PathBuf {
-    // chemin jusqu'au dossier
+pub fn ensure_db() -> PathBuf {
     let home = env::var("HOME").expect("HOME not set");
 
-    let mut dir = PathBuf::from(home);
-    dir.push(".dydyscord");
+    // Chemin jusqu'au dossier de l'app
+    let mut db = PathBuf::from(home);
+    db.push(APP_FOLDER);
 
     // Créer le dossier de l'app si non existant
-    if !dir.exists() {
-        fs::create_dir_all(&dir).expect("Failed to create dir");
-        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+    if !db.exists() {
+        fs::create_dir_all(&db).expect("Failed to create dir");
+        fs::set_permissions(&db, fs::Permissions::from_mode(0o700)).unwrap();
     }
 
-    // chemin jusqu'au fichier db sqlite
-    let mut db = dir.clone();
-    db.push("state.db");
+    // Chemin jusqu'au fichier db sqlite
+    db.push(DB_FILE);
+
+    // Créer le fichier db si non existant
+    if !db.exists() {
+        fs::File::create(&db).expect("Failed to create db file");
+        fs::set_permissions(&db, fs::Permissions::from_mode(0o600)).unwrap();
+    }
+
     db
+}
+
+pub fn db_exists() -> bool {
+    let home = env::var("HOME").expect("HOME not set");
+    let dir = PathBuf::from(home).join(APP_FOLDER);
+    let db = dir.join(DB_FILE);
+    dir.exists() && db.exists()
+}
+
+pub fn db_key_exists(user_id: &str, device_id: &str) -> bool {
+    let account = format!("{user_id}:{device_id}");
+    keyring::Entry::new("dydyscord", &account)
+        .and_then(|e| e.get_password())
+        .is_ok()
 }

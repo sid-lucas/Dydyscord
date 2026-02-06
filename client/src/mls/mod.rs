@@ -32,6 +32,10 @@ impl OpenMlsProvider for MyProvider {
     }
 }
 
+pub fn device_init() {
+    
+}
+
 // A helper to create and store credentials.
 /*
 fn generate_credential_with_key(

@@ -1,4 +1,5 @@
 use crate::error::ClientError;
+use crate::mls::storage;
 use crate::opaque::auth::LoginResult;
 
 use uuid::Uuid;
@@ -13,13 +14,20 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(login: LoginResult) -> Result<Self, ClientError> {
-        Ok(Session {
+    pub fn new(login: LoginResult) -> Self {
+        Session {
             user_id: login.id,
             device_id: String::from("temp"), // TODO
             export_key: login.export_key,
             session_key: login.session_key,
             db_key: Vec::new(), // TODO
-        })
+        }
     }
+}
+
+pub fn device_exists(user_id: &str, device_id: &str) -> bool {
+    let has_key = storage::db_key_exists(user_id, device_id);
+    let has_db = storage::db_exists();
+
+    has_key && has_db
 }
