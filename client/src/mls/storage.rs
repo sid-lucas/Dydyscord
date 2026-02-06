@@ -1,7 +1,10 @@
+use base64::Engine;
+use openmls_sqlite_storage::Connection;
 use std::os::unix::fs::PermissionsExt;
 use std::{env, fs, path::PathBuf};
 
 use crate::error::ClientError;
+use crate::mls::crypto;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CodecError {
@@ -40,6 +43,17 @@ impl openmls_sqlite_storage::Codec for CBORCodec {
     }
 }
 
+pub fn open_sqlcipher(db_key: &[u8; 32]) -> Result<Connection, ClientError> {
+    let db_path = ensure_db();
+    let conn = Connection::open(db_path).map_err(|_| ClientError::Internal)?;
+
+    let key_string = base64::engine::general_purpose::STANDARD.encode(db_key);
+    conn.pragma_update(None, "key", &key_string)
+        .map_err(|_| ClientError::Internal)?;
+
+    Ok(conn)
+}
+
 pub fn ensure_db() -> PathBuf {
     let home = env::var("HOME").expect("HOME not set");
 
@@ -72,9 +86,37 @@ pub fn db_exists() -> bool {
     dir.exists() && db.exists()
 }
 
-pub fn db_key_exists(user_id: &str, device_id: &str) -> bool {
-    let account = format!("{user_id}:{device_id}");
+pub fn db_key_exists(user_id: &str) -> bool {
+    let account = format!("{user_id}");
     keyring::Entry::new("dydyscord", &account)
         .and_then(|e| e.get_password())
         .is_ok()
+}
+
+pub fn get_or_create_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], ClientError> {
+    let account = user_id.to_string();
+    let entry = keyring::Entry::new("dydyscord", &account).map_err(|_| ClientError::Keyring)?;
+
+    let export_key: &[u8; 32] = export_key.try_into().map_err(|_| ClientError::Internal)?;
+
+    // Essayer de récupérer la db_key si existe dans la keychain
+    if let Ok(wrapped_b64) = entry.get_password() {
+        let wrapped = base64::engine::general_purpose::STANDARD
+            .decode(wrapped_b64)
+            .map_err(|_| ClientError::Internal)?;
+        let db_key =
+            crypto::unwrap_db_key(export_key, &wrapped).map_err(|_| ClientError::Internal)?;
+        return Ok(db_key);
+    }
+
+    // Sinon créer + wrap + store dans la keychain
+    let db_key: [u8; 32] = rand::random();
+    let wrapped = crypto::wrap_db_key(export_key, &db_key).map_err(|_| ClientError::Internal)?;
+    let wrapped_b64 = base64::engine::general_purpose::STANDARD.encode(wrapped);
+
+    entry
+        .set_password(&wrapped_b64)
+        .map_err(|_| ClientError::Keyring)?;
+
+    Ok(db_key)
 }

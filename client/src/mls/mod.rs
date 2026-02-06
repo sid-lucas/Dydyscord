@@ -4,13 +4,14 @@ use openmls_rust_crypto::{OpenMlsRustCrypto, RustCrypto};
 use openmls_sqlite_storage::{Connection, SqliteStorageProvider};
 use openmls_traits::OpenMlsProvider;
 
+use crate::error::ClientError;
 use crate::mls::storage::CBORCodec;
 
 mod crypto;
 pub mod storage;
 pub mod test;
 
-struct MyProvider {
+pub struct MyProvider {
     crypto: RustCrypto,
     rand: RustCrypto,
     storage: SqliteStorageProvider<CBORCodec, Connection>,
@@ -32,8 +33,20 @@ impl OpenMlsProvider for MyProvider {
     }
 }
 
-pub fn device_init() {
-    
+pub fn prepare_provider(db_key: &[u8; 32]) -> Result<MyProvider, ClientError> {
+    let conn = storage::open_sqlcipher(db_key)?;
+
+    let mut storage = SqliteStorageProvider::<CBORCodec, _>::new(conn);
+
+    storage
+        .run_migrations()
+        .map_err(|_| ClientError::Internal)?;
+
+    Ok(MyProvider {
+        crypto: RustCrypto::default(),
+        rand: RustCrypto::default(),
+        storage,
+    })
 }
 
 // A helper to create and store credentials.

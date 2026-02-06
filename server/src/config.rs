@@ -1,5 +1,4 @@
 use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
 use dotenv::dotenv;
 use opaque_ke::ServerSetup;
 use redis::Client as RedisClient;
@@ -76,7 +75,7 @@ fn setup_pepper() -> Arc<SecretSlice<u8>> {
 fn setup_opaque() -> Arc<ServerSetup<OpaqueCiphersuite>> {
     let server_setup_b64 =
         std::env::var("OPAQUE_SERVER_SETUP").expect("OPAQUE_SERVER_SETUP must be set");
-    let server_setup_bytes = STANDARD
+    let server_setup_bytes = base64::engine::general_purpose::STANDARD
         .decode(server_setup_b64)
         .expect("OPAQUE_SERVER_SETUP invalid base64");
     let server_setup = ServerSetup::<OpaqueCiphersuite>::deserialize(&server_setup_bytes)

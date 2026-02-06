@@ -25,4 +25,10 @@ pub enum ClientError {
 
     #[error("unauthorized access")]
     Unauthorized,
+
+    #[error("internal error")]
+    Internal,
+
+    #[error("keyring error")]
+    Keyring,
 }

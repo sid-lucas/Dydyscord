@@ -1,4 +1,4 @@
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::Engine;
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::RustCrypto;

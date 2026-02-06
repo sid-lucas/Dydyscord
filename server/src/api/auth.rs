@@ -5,7 +5,7 @@ use crate::opaque::models::{
     RegisterStartRequest, RegisterStartResponse,
 };
 use axum::{Json, extract::State, http::StatusCode};
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::Engine;
 use hmac::Mac;
 use opaque_ke::{
     CredentialFinalization, CredentialRequest, RegistrationRequest, RegistrationUpload,
@@ -175,7 +175,7 @@ pub async fn login_start(
     // Génération d'un nonce unique pour retrouver le server_login_state
     let mut nonce = [0u8; 32];
     OsRng.fill_bytes(&mut nonce);
-    let nonce = URL_SAFE_NO_PAD.encode(nonce);
+    let nonce = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(nonce);
     let redis_key = format!("opaque:login:{}", &nonce);
 
     let state_bytes: Vec<u8> = start.state.serialize().to_vec();

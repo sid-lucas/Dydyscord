@@ -1,7 +1,7 @@
 use inquire_derive::Selectable;
 use std::fmt;
 
-use crate::session::Session;
+use crate::{mls::storage::get_or_create_db_key, opaque::auth::login, session::Session};
 
 mod api;
 mod error;
@@ -70,22 +70,38 @@ fn run() -> Result<(), error::ClientError> {
                 match choice {
                     LoggedOutChoice::Login => match opaque::auth::login() {
                         Ok(login_result) => {
-                            // OPAQUE
-                            let session = Session::new(login_result);
+                            // Ajout des informations de login OPAQUE dans la session
+                            let mut session = Session::new(login_result);
 
-                            // OpenMLS
-                            if session::device_exists(
+                            // Récupère info si c'est un nouveau device avant potentielle initialisation de la db
+                            let new_device = session::device_exists(&session.user_id.to_string());
+
+                            // Récupèration/Création de la clé de chiffrement de la db
+                            let db_key = get_or_create_db_key(
                                 &session.user_id.to_string(),
-                                &session.device_id,
-                            ) {
+                                &session.export_key,
+                            )
+                            .unwrap();
+
+                            // Ouverture de la connexion de la db et préparation du provider OpenMLS
+                            session.set_provider(&db_key);
+
+                            if new_device {
                                 // Faire appel au serveur genre /create/device
                                 // pour créer un nouveau device dans la bdd lié à l'utilisateur loggé
                                 // et retourner "device_id" à l'utilisateur
-                                // device_id servira à stocker la db_key dans le keystore
-                                // device_id sera aussi présent dans device.db du client (normalement)
+                                // device_id sera présent dans device.db du client (normalement)
+                                // car je crois qu'il sera important quand on fera des requêtes au serveur de lui
+                                // montrer quel device du compte on utilise pour la création de groupe ou autre.
+
+                                // TODO : CREER LES TYPES OPENMLS NECESSAIRES ET STOCKER DANS LA DB LOCALE
+                                println!("New device detected.")
                             } else {
                                 //
                                 // La c'est si le device est reconnu (a deja fait l'initialisation OpenMLS)
+
+                                // TODO : LIRE LES TYPES DE LA DB LOCALE
+                                println!("Retrieved device information.")
                             }
 
                             println!("Login successful!");
