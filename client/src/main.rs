@@ -73,9 +73,9 @@ fn run() -> Result<(), error::ClientError> {
                             // Ajout des informations de login OPAQUE dans la session
                             let mut session = Session::new(login_result);
 
-                            // Récupère info si c'est un nouveau device avant potentielle initialisation de la db
-                            let new_device = !session::device_exists(&session.user_id.to_string());
-                            println!("new device ? {}", new_device);
+                            // Reconcile + récupère si le device est reconnu avant potentielle init de la db
+                            let new_device =
+                                !session::reconcile_device_storage(&session.user_id.to_string());
 
                             // Récupèration/Création de la clé de chiffrement de la db
                             let db_key = get_or_create_db_key(

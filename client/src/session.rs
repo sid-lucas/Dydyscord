@@ -31,7 +31,9 @@ impl Session {
     }
 }
 
-pub fn device_exists(user_id: &str) -> bool {
+// Check si existe deja une db + db_key (device existe)
+// ou si l'un manque (device non existant et purge si incohérence)
+pub fn reconcile_device_storage(user_id: &str) -> bool {
     let has_key = storage::db_key_exists(user_id);
     let has_db = storage::db_exists();
 
@@ -39,9 +41,10 @@ pub fn device_exists(user_id: &str) -> bool {
     if has_db && !has_key {
         let _ = storage::purge_db();
     }
+
     //TODO : Print de debug
     println!("has_key : {}", has_key);
     println!("has_db : {}", has_db);
 
-    has_key && has_db
+    has_db && has_key
 }
