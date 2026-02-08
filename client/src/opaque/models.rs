@@ -40,3 +40,10 @@ pub struct LoginFinishRequest {
     pub finish_login_request: String, // base64
     pub nonce: String,                // clé-valeur pour retrouver le server_login_state
 }
+
+// Create new device
+
+#[derive(Serialize)]
+pub struct NewDeviceRequest<'a> {
+    pub username: &'a str,
+}

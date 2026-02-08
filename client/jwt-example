@@ -1,0 +1,136 @@
+//In endpoint generate cookie and send it:
+
+
+            // Generate JWT token
+            let token = create_jwt(&payload.username, &user.role).expect("Failed to create JWT token");
+            let token_clone = token.clone();
+
+            // Create cookie (HttpOnly, Secure for production)
+            let cookie = Cookie::build((AUTH_HEADER, token))
+                .http_only(false)// TODO change
+                .secure(true)
+                .same_site(SameSite::Strict)
+                .path("/")
+                .finish();
+
+            let jar = CookieJar::new().add(cookie);
+
+            // Encode the keys to base64
+            let pub_enc = URL_SAFE_NO_PAD.encode(pub_enc);
+            let cpriv_enc = URL_SAFE_NO_PAD.encode(cpriv_enc);
+            let nonce_priv_enc = URL_SAFE_NO_PAD.encode(nonce_priv_enc);
+            let pub_sign = URL_SAFE_NO_PAD.encode(pub_sign);
+            let cpriv_sign = URL_SAFE_NO_PAD.encode(cpriv_sign);
+            let nonce_priv_sign = URL_SAFE_NO_PAD.encode(nonce_priv_sign);
+
+            let content = Json(LoginEndResult {
+                pub_enc,
+                cpriv_enc,
+                nonce_priv_enc,
+                pub_sign,
+                cpriv_sign,
+                nonce_priv_sign,
+                auth_token: token_clone,
+            });
+
+            Ok((jar, (StatusCode::OK, content)))
+
+
+
+//const.rs :
+
+/// Const for JWT
+pub const JWT_DURATION_MINUTES: i64 = 60;
+pub const AUTH_HEADER: &str = "auth-token";
+
+
+
+//main.rs :
+
+
+// build our application with a route
+    let app = Router::new()
+        //.route("/api/logout", post(api_handlers::logout))
+        .route("/api/pubkey/enc", post(api_handlers::get_pub_key_enc))
+        .route("/api/pubkey/sign", post(api_handlers::get_pub_key_sign))
+        .route("/api/messages", post(api_handlers::get_messages))
+        .route("/api/message/{id}", post(api_handlers::get_one_message))
+        .route("/api/message", post(api_handlers::upload_message))
+        .route("/api/message/uploadfinish/{file_id}", post(api_handlers::upload_message_finish_multipart))
+        //.route("/api/anonymous/message/{id}/content", post(api_handlers::anonymous_message_get_content))
+        .layer(middleware::from_fn(api_handlers_auth::jwt_auth))
+        // Apply JWT auth middleware to all routes defined before this line
+
+        .route("/api", get(api_handlers::root))
+        .route("/api/register/start", post(api_handlers::register_user_start))
+
+
+// jwtauth.rs :
+
+use axum::extract::Request;
+use axum::middleware::Next;
+use axum::{http::StatusCode, response::Response};
+use jsonwebtoken::{
+    DecodingKey, EncodingKey, Header, TokenData, Validation, decode, encode, errors::Error,
+};
+use serde::{Deserialize, Serialize};
+
+use crate::consts;
+use crate::consts::*;
+use crate::models::*;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    username: String, // username
+    role: String,     // user role
+    exp: usize,       // expiration time as UNIX timestamp
+}
+
+pub fn create_jwt(user_id: &str, role: &str) -> Result<String, Error> {
+    let expiration = chrono::Utc::now()
+        .checked_add_signed(chrono::Duration::minutes(JWT_DURATION_MINUTES))
+        .expect("valid timestamp")
+        .timestamp() as usize;
+
+    let claims = Claims {
+        username: user_id.to_owned(),
+        role: role.to_owned(),
+        exp: expiration,
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(JWT_SECRET_KEY.get().unwrap().as_ref()),
+    )
+}
+
+fn verify_jwt(token: &str) -> Result<TokenData<Claims>, Error> {
+    decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(JWT_SECRET_KEY.get().unwrap().as_ref()),
+        &Validation::default(),
+    )
+}
+
+pub async fn jwt_auth(req: Request, next: Next) -> Result<Response, StatusCode> {
+    // Get the Cookie
+    let headers = req.headers();
+    if let Some(cookie_header) = headers.get("Cookie") {
+        if let Ok(cookie_str) = cookie_header.to_str() {
+            // Look for the jwt_token cookie
+            for cookie in cookie_str.split(';') {
+                let cookie = cookie.trim();
+                if let Some(token) = cookie.strip_prefix(AUTH_HEADER) {
+                    let token = token.trim_start_matches('=').trim();
+                    return match verify_jwt(token) {
+                        Ok(_) => Ok(next.run(req).await), // JWT is valid, proceed to next handler
+                        Err(_) => Err(StatusCode::UNAUTHORIZED), // Invalid JWT
+                    };
+                }
+            }
+        }
+    }
+
+    Err(StatusCode::UNAUTHORIZED) // No Authorization header or invalid token
+}

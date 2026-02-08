@@ -76,3 +76,20 @@ pub fn opaque_login_finish(payload: LoginFinishRequest) -> Result<String, Client
         _ => Err(ClientError::Server),
     }
 }
+
+pub fn new_device(payload: LoginFinishRequest) -> Result<String, ClientError> {
+    let url = format!("{SERVER_URL}/login/finish");
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .map_err(|_| ClientError::Network)?;
+
+    match response.status() {
+        StatusCode::OK => Ok(response.text().map_err(|_| ClientError::InvalidResponse)?),
+        StatusCode::BAD_REQUEST => Err(ClientError::BadRequest),
+        StatusCode::UNAUTHORIZED => Err(ClientError::Unauthorized),
+        _ => Err(ClientError::Server),
+    }
+}
