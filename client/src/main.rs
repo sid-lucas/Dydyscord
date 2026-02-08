@@ -1,9 +1,10 @@
 use inquire_derive::Selectable;
 use std::fmt;
 
-use crate::{mls::storage::get_or_create_db_key, opaque::auth::login, session::Session};
+use crate::{mls::storage::get_or_create_db_key, session::Session};
 
 mod api;
+mod constants;
 mod error;
 mod mls;
 mod opaque;

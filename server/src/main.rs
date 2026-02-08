@@ -4,12 +4,11 @@ use axum::{
     routing::{get, post},
 };
 
-mod config;
-mod database;
 mod api;
+mod config;
+mod constants;
+mod database;
 mod opaque;
-
-const SERVER_ADDR: &str = "0.0.0.0:3000";
 
 #[tokio::main]
 async fn main() {
@@ -26,7 +25,9 @@ async fn main() {
         .route("/login/finish", post(api::auth::login_finish))
         .with_state(server_state);
 
-    let listener = tokio::net::TcpListener::bind(SERVER_ADDR).await.unwrap();
-    println!("🚀 Listening on {}", SERVER_ADDR);
+    let listener = tokio::net::TcpListener::bind(constants::SERVER_ADDR)
+        .await
+        .unwrap();
+    println!("🚀 Listening on {}", constants::SERVER_ADDR);
     let _ = axum::serve(listener, app).await;
 }

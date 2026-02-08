@@ -3,6 +3,7 @@ use openmls_sqlite_storage::Connection;
 use std::os::unix::fs::PermissionsExt;
 use std::{env, fs, path::PathBuf};
 
+use crate::constants;
 use crate::error::ClientError;
 use crate::mls::crypto;
 
@@ -17,12 +18,6 @@ pub enum CodecError {
     #[error("crypto error")]
     Crypto,
 }
-
-const APP_FOLDER: &str = ".dydyscord";
-// TODO : faire que le nom du fichier comporte l'user_id
-// Ca permettra a l'avenir de se connecter sur plusieurs compte différent
-// et de garder le device associé a chacun de ces comptes.
-const DB_FILE: &str = "device.db";
 
 pub struct CBORCodec;
 
@@ -62,7 +57,7 @@ pub fn ensure_db() -> PathBuf {
 
     // Chemin jusqu'au dossier de l'app
     let mut db = PathBuf::from(home);
-    db.push(APP_FOLDER);
+    db.push(constants::APP_FOLDER);
 
     // Créer le dossier de l'app si non existant
     if !db.exists() {
@@ -71,7 +66,7 @@ pub fn ensure_db() -> PathBuf {
     }
 
     // Chemin jusqu'au fichier db sqlite
-    db.push(DB_FILE);
+    db.push(constants::DB_FILE);
 
     // Créer le fichier db si non existant
     if !db.exists() {
@@ -84,8 +79,8 @@ pub fn ensure_db() -> PathBuf {
 
 pub fn db_exists() -> bool {
     let home = env::var("HOME").expect("HOME not set");
-    let dir = PathBuf::from(home).join(APP_FOLDER);
-    let db = dir.join(DB_FILE);
+    let dir = PathBuf::from(home).join(constants::APP_FOLDER);
+    let db = dir.join(constants::DB_FILE);
     dir.exists() && db.exists()
 }
 

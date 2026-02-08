@@ -1,7 +1,7 @@
 use crate::error::ClientError;
 use crate::opaque::models::{
-    LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
-    RegisterStartRequest, RegisterStartResponse,
+    LoginFinishRequest, LoginStartRequest, LoginStartResponse, NewDeviceRequest,
+    RegisterFinishRequest, RegisterStartRequest, RegisterStartResponse,
 };
 use reqwest::StatusCode;
 
@@ -77,7 +77,7 @@ pub fn opaque_login_finish(payload: LoginFinishRequest) -> Result<String, Client
     }
 }
 
-pub fn new_device(payload: LoginFinishRequest) -> Result<String, ClientError> {
+pub fn new_device(payload: NewDeviceRequest) -> Result<String, ClientError> {
     let url = format!("{SERVER_URL}/login/finish");
     let client = reqwest::blocking::Client::new();
     let response = client
