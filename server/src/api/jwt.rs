@@ -1,5 +1,6 @@
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use chrono::Utc;
-use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -65,9 +66,38 @@ pub fn create_jwt(sub: &str, prm: &str) -> Result<String, jsonwebtoken::errors::
     let claims = Claims::new(sub, prm);
 
     // Envoie retour du token (header + payload + signature)
-    jsonwebtoken::encode(
+    jsonwebtoken::encode::<Claims>(
         &header,
         &claims,
         &EncodingKey::from_secret(constants::JWT_SECRET_KEY.get().unwrap().as_ref()),
     )
+}
+
+pub async fn verify_jwt(req: Request, next: Next) -> Result<Response, StatusCode> {
+    // Récupère le cookie
+    let cookie = req
+        .headers()
+        .get("Cookie")
+        .and_then(|v: &axum::http::HeaderValue| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Récupère le JWT du cookie
+    let token = cookie
+        .split(';')
+        .map(|cookie: &str| cookie.trim())
+        .find_map(|cookie: &str| cookie.strip_prefix(constants::AUTH_HEADER))
+        .map(|token: &str| token.trim_start_matches('=').trim())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Decode token + signature OK + checks de claims (selon Validation)
+    let decoded = jsonwebtoken::decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(constants::JWT_SECRET_KEY.get().unwrap().as_ref()),
+        &Validation::default(),
+    );
+
+    match decoded {
+        Ok(_) => Ok(next.run(req).await),        // JWT valide
+        Err(_) => Err(StatusCode::UNAUTHORIZED), // JWT invalide
+    }
 }

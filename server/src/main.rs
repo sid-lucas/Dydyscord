@@ -1,6 +1,6 @@
 use crate::config::init_server_state;
 use axum::{
-    Router,
+    Router, middleware,
     routing::{get, post},
 };
 
@@ -18,6 +18,10 @@ async fn main() {
     let server_state = init_server_state().await;
 
     let app = Router::new()
+        // Routes protégées par authentification (nécessite login):
+        .route("create/device", post(api::root))
+        .layer(middleware::from_fn(api::jwt::verify_jwt))
+        // Routes ouvertes :
         .route("/", get(api::root))
         .route("/register/start", post(api::auth::register_start))
         .route("/register/finish", post(api::auth::register_finish))
