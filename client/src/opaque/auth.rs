@@ -120,7 +120,7 @@ pub fn login() -> Result<LoginResult, ClientError> {
     let start_login_request =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
-    // Délai aléatoire pour éviter les attaques timing
+    // Délai aléatoire pour éviter les attaques timing // TODO A CHANGER
     let random_delay = Duration::from_millis(300 + (rand::random::<u64>() % 200));
     thread::sleep(random_delay);
 
@@ -129,12 +129,8 @@ pub fn login() -> Result<LoginResult, ClientError> {
         username: &username,
         start_login_request,
     });
-    let (login_response_b64, nonce, id) = match response {
-        Ok(response) => (
-            response.start_login_response,
-            response.nonce,
-            response.user_id,
-        ),
+    let (login_response_b64, id) = match response {
+        Ok(response) => (response.start_login_response, response.user_id),
         Err(e) => return Err(e.into()),
     };
 
@@ -160,21 +156,6 @@ pub fn login() -> Result<LoginResult, ClientError> {
     let export_key = finish.export_key.to_vec();
     let session_key = finish.session_key.to_vec();
 
-    //////////////
-    // ICI CHECK SI A LA DB ET SI ON PEUT LA LIRE AVEC L'EXPORT_KEY POUR SAVOIR SI NOUVEAU DEVICE OU NON?
-    // regarde ici si c'est un nouveau device:
-
-    // Reconcile + récupère si le device est reconnu avant potentielle init de la db
-    let new_device = !session::reconcile_device_storage(&id.to_string());
-
-    // Récupèration/Création de la clé de chiffrement de la db
-    let db_key = storage::get_or_create_db_key(&id.to_string(), &export_key).unwrap();
-
-    // LIRE device_id de la db local sqlcipher (si n'existe pas, demander au serveur de le créer de son côté et de nou l'envoyer.)
-    //let db_key = get_or_create_db_key(&user_id, &export_key)?;
-    //let conn = open_sqlcipher(&db_key)?;
-    //let device_id = read_device_id(&conn)?; // SELECT device_id FROM device_meta LIMIT 1
-
     // Préparation de la request à envoyer au serveur+
     let finish_login_request =
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
@@ -182,9 +163,12 @@ pub fn login() -> Result<LoginResult, ClientError> {
     // Call API (envoi requête et réception réponse)
     api::opaque_login_finish(LoginFinishRequest {
         finish_login_request,
-        nonce,
+        user_id: id,
     })
     .map_err(|e| e.into())?;
+
+    let string_temp = String::from("Salut");
+    api::new_device(string_temp).map_err(|e| e.into())?;
 
     Ok(LoginResult {
         id,

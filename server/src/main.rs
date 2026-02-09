@@ -3,6 +3,7 @@ use axum::{
     Router, middleware,
     routing::{get, post},
 };
+use dotenv::dotenv;
 
 mod api;
 mod config;
@@ -15,11 +16,20 @@ async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
+    dotenv().ok();
+    let secret = std::env::var("JWT_SECRET_KEY").expect("JWT_SECRET_KEY must be set");
+    constants::JWT_SECRET_KEY
+        .set(secret)
+        .expect("JWT_SECRET_KEY already set");
+
     let server_state = init_server_state().await;
 
     let app = Router::new()
         // Routes protégées par authentification (nécessite login):
-        .route("/device", post(api::root))
+        .route(
+            "/device",
+            post(api::root).layer(middleware::from_fn(api::jwt::verify_jwt_auth)),
+        )
         // Routes ouvertes :
         .route("/", get(api::root))
         .route("/register/start", post(api::auth::register_start))

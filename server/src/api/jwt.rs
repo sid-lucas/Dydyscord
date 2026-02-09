@@ -1,11 +1,17 @@
 use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use chrono::Utc;
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use sqlx::decode;
 use uuid::Uuid;
 
 use crate::constants;
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TokenType {
+    Auth,
+    Access,
+    Refresh,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -57,13 +63,6 @@ impl Claims {
     pub fn jti(&self) -> &Uuid {
         &self.jti
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-enum TokenType {
-    Auth,
-    Access,
-    Refresh,
 }
 
 pub fn create_jwt(sub: &str, typ: TokenType) -> Result<String, jsonwebtoken::errors::Error> {
@@ -126,5 +125,5 @@ pub async fn verify_jwt_access(req: Request, next: Next) -> Result<Response, Sta
 }
 
 pub async fn verify_jwt_auth(req: Request, next: Next) -> Result<Response, StatusCode> {
-    verify_jwt_with_type(req, next, TokenType::Auth)
+    verify_jwt_with_type(req, next, TokenType::Auth).await
 }

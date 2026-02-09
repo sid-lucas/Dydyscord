@@ -1,11 +1,15 @@
-use crate::api::jwt::create_jwt;
+use crate::api::jwt;
 use crate::config::ServerState;
+use crate::constants;
 use crate::opaque::DefaultCipherSuite as DCS;
 use crate::opaque::models::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
     RegisterStartRequest, RegisterStartResponse,
 };
+
 use axum::{Json, extract::State, http::StatusCode};
+use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
+
 use base64::Engine;
 use hmac::Mac;
 use opaque_ke::{
@@ -173,15 +177,10 @@ pub async fn login_start(
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Génération d'un nonce unique pour retrouver le server_login_state
-    let mut nonce = [0u8; 32];
-    OsRng.fill_bytes(&mut nonce);
-    let nonce = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(nonce);
-    let redis_key = format!("opaque:login:{}", &nonce);
-
+    // Sauvegarde du server_login_state dans Redis avec expiration
+    let redis_key = format!("opaque:login:{}", &user_id);
     let state_bytes: Vec<u8> = start.state.serialize().to_vec();
     let ttl_seconds: u64 = 120;
-    // Sauvegarde du server_login_state dans Redis avec expiration
     let _: () = state
         .redis
         .set_ex(&redis_key, state_bytes, ttl_seconds)
@@ -196,7 +195,6 @@ pub async fn login_start(
         StatusCode::OK,
         Json(LoginStartResponse {
             start_login_response,
-            nonce,
             user_id,
         }),
     ))
@@ -205,9 +203,9 @@ pub async fn login_start(
 pub async fn login_finish(
     State(mut state): State<ServerState>,
     Json(payload): Json<LoginFinishRequest>,
-) -> Result<StatusCode, StatusCode> {
-    // Création de la clé avec le nonce
-    let redis_key = format!("opaque:login:{}", payload.nonce);
+) -> Result<CookieJar, StatusCode> {
+    // Création de la clé avec le user_id
+    let redis_key = format!("opaque:login:{}", payload.user_id);
 
     // Récupération du server_login_state depuis Redis
     let state_bytes: Option<Vec<u8>> = state
@@ -216,7 +214,7 @@ pub async fn login_finish(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Si la récupération n'a pas fonctionné (nonce invalide)
+    // Si la récupération n'a pas fonctionné (key invalide)
     let state_bytes: Vec<u8> = match state_bytes {
         Some(v) => v,
         None => return Err(StatusCode::UNAUTHORIZED),
@@ -233,9 +231,9 @@ pub async fn login_finish(
     let finish_login_request = base64::engine::general_purpose::STANDARD
         .decode(&payload.finish_login_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
-
     let finish_login_request = CredentialFinalization::<DCS>::deserialize(&finish_login_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
+
     // Désérialiser server_login_state puis finish()
     let server_login_state = ServerLogin::<DCS>::deserialize(&state_bytes)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -247,8 +245,19 @@ pub async fn login_finish(
     // secret partagé entre le client et le serveur
     let _session_key = finish.session_key;
 
-    // TODO Créer token ? mais on peut seulement avec user_id si on le récup.
-    // et il faudrait plutot faire un token avec device_id je crois...
+    // Création du JWT intermédiaire (auth)
+    let id = payload.user_id.to_string();
+    let token = jwt::create_jwt(id.as_str(), jwt::TokenType::Auth)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(StatusCode::OK)
+    let cookie = Cookie::build((constants::AUTH_HEADER, token))
+        .http_only(false) // TODO change
+        .secure(false) // TODO Change: true interdit l'envoi un HTTP. -> false pour test local pour l'instant.
+        .same_site(SameSite::Strict)
+        .path("/")
+        .build(); // si erreur: remplace .build() par .finish()
+
+    let jar = CookieJar::new().add(cookie);
+
+    Ok(jar)
 }
