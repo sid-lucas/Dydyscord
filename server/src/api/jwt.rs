@@ -1,6 +1,6 @@
 use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use chrono::Utc;
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
 use sqlx::decode;
 use uuid::Uuid;
@@ -9,8 +9,8 @@ use crate::constants;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    sub: String, // Optional. Subject, whom token refers to (user_id ou device_id?)
-    typ: String, // Custom field created by me, type : Auth, Refresh, Access
+    sub: String,    // Optional. Subject, whom token refers to (user_id ou device_id?)
+    typ: TokenType, // Custom field created by me, type : Auth, Refresh, Access
     //prm: String, // Custom field created by me, Permissions/prm (role)
     aud: String, // Optional. Audience (ex: payments-service)
     exp: usize, // Required. (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
@@ -19,13 +19,13 @@ pub struct Claims {
 }
 
 impl Claims {
-    pub fn new(sub: &str, typ: &str) -> Self {
+    pub fn new(sub: &str, typ: TokenType) -> Self {
         let now = Utc::now().timestamp();
         let ttl = constants::JWT_TTL;
 
         Claims {
             sub: sub.to_string(),
-            typ: typ.to_string(),
+            typ,
             aud: constants::JWT_AUDIENCE.to_string(),
             exp: (now + ttl) as usize,
             iat: now as usize,
@@ -38,7 +38,7 @@ impl Claims {
         &self.sub
     }
 
-    pub fn typ(&self) -> &str {
+    pub fn typ(&self) -> &TokenType {
         &self.typ
     }
 
@@ -59,7 +59,14 @@ impl Claims {
     }
 }
 
-pub fn create_jwt(sub: &str, typ: &str) -> Result<String, jsonwebtoken::errors::Error> {
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+enum TokenType {
+    Auth,
+    Access,
+    Refresh,
+}
+
+pub fn create_jwt(sub: &str, typ: TokenType) -> Result<String, jsonwebtoken::errors::Error> {
     // Header du token
     let mut header = Header::new(Algorithm::HS256);
     header.typ = Some("JWT".to_string());
@@ -75,7 +82,11 @@ pub fn create_jwt(sub: &str, typ: &str) -> Result<String, jsonwebtoken::errors::
     )
 }
 
-pub async fn verify_jwt_auth(req: Request, next: Next) -> Result<Response, StatusCode> {
+pub async fn verify_jwt_with_type(
+    req: Request,
+    next: Next,
+    typ: TokenType,
+) -> Result<Response, StatusCode> {
     // Récupère le cookie
     let cookie = req
         .headers()
@@ -100,10 +111,10 @@ pub async fn verify_jwt_auth(req: Request, next: Next) -> Result<Response, Statu
 
     match decoded {
         Ok(data) => {
-            if data.claims.typ == "Auth" {
+            if data.claims.typ == typ {
                 Ok(next.run(req).await)
             } else {
-                Err(StatusCode::FORBIDDEN) // ou UNAUTHORIZED selon ton choix
+                Err(StatusCode::UNAUTHORIZED)
             }
         }
         Err(_) => Err(StatusCode::UNAUTHORIZED),
@@ -111,36 +122,9 @@ pub async fn verify_jwt_auth(req: Request, next: Next) -> Result<Response, Statu
 }
 
 pub async fn verify_jwt_access(req: Request, next: Next) -> Result<Response, StatusCode> {
-    // Récupère le cookie
-    let cookie = req
-        .headers()
-        .get("Cookie")
-        .and_then(|v: &axum::http::HeaderValue| v.to_str().ok())
-        .ok_or(StatusCode::UNAUTHORIZED)?;
+    verify_jwt_with_type(req, next, TokenType::Access).await
+}
 
-    // Récupère le JWT du cookie
-    let token = cookie
-        .split(';')
-        .map(|cookie: &str| cookie.trim())
-        .find_map(|cookie: &str| cookie.strip_prefix(constants::AUTH_HEADER))
-        .map(|token: &str| token.trim_start_matches('=').trim())
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    // Decode token + signature OK + checks de claims (selon Validation)
-    let decoded = jsonwebtoken::decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(constants::JWT_SECRET_KEY.get().unwrap().as_ref()),
-        &Validation::default(),
-    );
-
-    match decoded {
-        Ok(data) => {
-            if data.claims.typ == "Access" {
-                Ok(next.run(req).await)
-            } else {
-                Err(StatusCode::FORBIDDEN) // ou UNAUTHORIZED selon ton choix
-            }
-        }
-        Err(_) => Err(StatusCode::UNAUTHORIZED),
-    }
+pub async fn verify_jwt_auth(req: Request, next: Next) -> Result<Response, StatusCode> {
+    verify_jwt_with_type(req, next, TokenType::Auth)
 }
