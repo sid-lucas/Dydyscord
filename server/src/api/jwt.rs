@@ -2,6 +2,7 @@ use axum::{extract::Request, http::StatusCode, middleware::Next, response::Respo
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use sqlx::decode;
 use uuid::Uuid;
 
 use crate::constants;
@@ -9,7 +10,8 @@ use crate::constants;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     sub: String, // Optional. Subject, whom token refers to (user_id ou device_id?)
-    prm: String, // Custom field created by me, Permissions/prm
+    typ: String, // Custom field created by me, type : Auth, Refresh, Access
+    //prm: String, // Custom field created by me, Permissions/prm (role)
     aud: String, // Optional. Audience (ex: payments-service)
     exp: usize, // Required. (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
     iat: usize, // Optional. Issued at (as UTC timestamp)
@@ -17,13 +19,13 @@ pub struct Claims {
 }
 
 impl Claims {
-    pub fn new(sub: &str, prm: &str) -> Self {
+    pub fn new(sub: &str, typ: &str) -> Self {
         let now = Utc::now().timestamp();
         let ttl = constants::JWT_TTL;
 
         Claims {
             sub: sub.to_string(),
-            prm: prm.to_string(),
+            typ: typ.to_string(),
             aud: constants::JWT_AUDIENCE.to_string(),
             exp: (now + ttl) as usize,
             iat: now as usize,
@@ -36,8 +38,8 @@ impl Claims {
         &self.sub
     }
 
-    pub fn prm(&self) -> &str {
-        &self.prm
+    pub fn typ(&self) -> &str {
+        &self.typ
     }
 
     pub fn aud(&self) -> &str {
@@ -57,13 +59,13 @@ impl Claims {
     }
 }
 
-pub fn create_jwt(sub: &str, prm: &str) -> Result<String, jsonwebtoken::errors::Error> {
+pub fn create_jwt(sub: &str, typ: &str) -> Result<String, jsonwebtoken::errors::Error> {
     // Header du token
     let mut header = Header::new(Algorithm::HS256);
     header.typ = Some("JWT".to_string());
 
     // Payload du token
-    let claims = Claims::new(sub, prm);
+    let claims = Claims::new(sub, typ);
 
     // Envoie retour du token (header + payload + signature)
     jsonwebtoken::encode::<Claims>(
@@ -73,7 +75,7 @@ pub fn create_jwt(sub: &str, prm: &str) -> Result<String, jsonwebtoken::errors::
     )
 }
 
-pub async fn verify_jwt(req: Request, next: Next) -> Result<Response, StatusCode> {
+pub async fn verify_jwt_auth(req: Request, next: Next) -> Result<Response, StatusCode> {
     // Récupère le cookie
     let cookie = req
         .headers()
@@ -97,7 +99,48 @@ pub async fn verify_jwt(req: Request, next: Next) -> Result<Response, StatusCode
     );
 
     match decoded {
-        Ok(_) => Ok(next.run(req).await),        // JWT valide
-        Err(_) => Err(StatusCode::UNAUTHORIZED), // JWT invalide
+        Ok(data) => {
+            if data.claims.typ == "Auth" {
+                Ok(next.run(req).await)
+            } else {
+                Err(StatusCode::FORBIDDEN) // ou UNAUTHORIZED selon ton choix
+            }
+        }
+        Err(_) => Err(StatusCode::UNAUTHORIZED),
+    }
+}
+
+pub async fn verify_jwt_access(req: Request, next: Next) -> Result<Response, StatusCode> {
+    // Récupère le cookie
+    let cookie = req
+        .headers()
+        .get("Cookie")
+        .and_then(|v: &axum::http::HeaderValue| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Récupère le JWT du cookie
+    let token = cookie
+        .split(';')
+        .map(|cookie: &str| cookie.trim())
+        .find_map(|cookie: &str| cookie.strip_prefix(constants::AUTH_HEADER))
+        .map(|token: &str| token.trim_start_matches('=').trim())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Decode token + signature OK + checks de claims (selon Validation)
+    let decoded = jsonwebtoken::decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(constants::JWT_SECRET_KEY.get().unwrap().as_ref()),
+        &Validation::default(),
+    );
+
+    match decoded {
+        Ok(data) => {
+            if data.claims.typ == "Access" {
+                Ok(next.run(req).await)
+            } else {
+                Err(StatusCode::FORBIDDEN) // ou UNAUTHORIZED selon ton choix
+            }
+        }
+        Err(_) => Err(StatusCode::UNAUTHORIZED),
     }
 }

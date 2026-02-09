@@ -42,7 +42,7 @@ pub fn reconcile_device_storage(user_id: &str) -> bool {
         let _ = storage::purge_db();
     }
 
-    //TODO : Print de debug
+    //TODO : remove, Print de debug
     println!("has_key : {}", has_key);
     println!("has_db : {}", has_db);
 

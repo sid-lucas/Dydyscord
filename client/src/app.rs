@@ -1,7 +1,6 @@
 use crate::{
-    choice,
-    error,
-    mls::storage::get_or_create_db_key,
+    choice, error,
+    mls::storage,
     opaque,
     session::{self, Session},
 };
@@ -10,7 +9,6 @@ enum AppState {
     LoggedOut,
     LoggedIn(Session),
 }
-
 
 pub fn run() -> Result<(), error::ClientError> {
     let mut appstate = AppState::LoggedOut;
@@ -41,9 +39,11 @@ fn handle_logged_out() -> Result<Option<AppState>, error::ClientError> {
                 let new_device = !session::reconcile_device_storage(&session.user_id.to_string());
 
                 // Récupèration/Création de la clé de chiffrement de la db
-                let db_key =
-                    get_or_create_db_key(&session.user_id.to_string(), &session.export_key)
-                        .unwrap();
+                let db_key = storage::get_or_create_db_key(
+                    &session.user_id.to_string(),
+                    &session.export_key,
+                )
+                .unwrap();
 
                 // Ouverture de la connexion de la db et préparation du provider OpenMLS
                 session.set_provider(&db_key)?;

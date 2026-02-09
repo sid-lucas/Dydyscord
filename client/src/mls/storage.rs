@@ -99,7 +99,8 @@ pub fn purge_db() {
 
 pub fn get_or_create_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], ClientError> {
     let account = user_id.to_string();
-    let entry = keyring::Entry::new("dydyscord", &account).map_err(|_| ClientError::Keyring)?;
+    let entry = keyring::Entry::new(constants::KEYRING_SERVICE_NAME, &account)
+        .map_err(|_| ClientError::Keyring)?;
 
     // Essayer de récupérer la db_key si existe dans la keychain
     if let Ok(wrapped_b64) = entry.get_password() {

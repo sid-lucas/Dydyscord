@@ -5,3 +5,5 @@ pub const APP_FOLDER: &str = ".dydyscord";
 // Ca permettra a l'avenir de se connecter sur plusieurs compte différent
 // et de garder le device associé a chacun de ces comptes.
 pub const DB_FILE: &str = "device.db";
+
+pub const KEYRING_SERVICE_NAME: &str = "dydyscord";
