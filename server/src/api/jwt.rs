@@ -101,11 +101,14 @@ pub async fn verify_jwt_with_type(
         .map(|token: &str| token.trim_start_matches('=').trim())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.set_audience(&[constants::JWT_AUDIENCE]);
+
     // Decode token + signature OK + checks de claims (selon Validation)
     let decoded = jsonwebtoken::decode::<Claims>(
         token,
         &DecodingKey::from_secret(constants::JWT_SECRET_KEY.get().unwrap().as_ref()),
-        &Validation::default(),
+        &validation,
     );
 
     match decoded {
