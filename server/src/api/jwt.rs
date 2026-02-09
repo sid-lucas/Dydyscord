@@ -6,14 +6,14 @@ use uuid::Uuid;
 
 use crate::constants;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum TokenType {
     Auth,
     Access,
     Refresh,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     sub: String,    // Optional. Subject, whom token refers to (user_id ou device_id?)
     typ: TokenType, // Custom field created by me, type : Auth, Refresh, Access
@@ -82,7 +82,7 @@ pub fn create_jwt(sub: &str, typ: TokenType) -> Result<String, jsonwebtoken::err
 }
 
 pub async fn verify_jwt_with_type(
-    req: Request,
+    mut req: Request,
     next: Next,
     typ: TokenType,
 ) -> Result<Response, StatusCode> {
@@ -114,6 +114,10 @@ pub async fn verify_jwt_with_type(
     match decoded {
         Ok(data) => {
             if data.claims.typ == typ {
+                // Add claims to request extensions if needed
+                req.extensions_mut().insert(data.claims);
+
+                // Proceed to the next middleware or handler
                 Ok(next.run(req).await)
             } else {
                 Err(StatusCode::UNAUTHORIZED)

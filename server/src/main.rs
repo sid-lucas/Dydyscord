@@ -28,7 +28,7 @@ async fn main() {
         // Routes protégées par authentification (nécessite login):
         .route(
             "/device",
-            post(api::root).layer(middleware::from_fn(api::jwt::verify_jwt_auth)),
+            post(api::).layer(middleware::from_fn(api::jwt::verify_jwt_auth)),
         )
         // Routes ouvertes :
         .route("/", get(api::root))
