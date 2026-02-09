@@ -1,5 +1,7 @@
 use std::cell::OnceCell;
 
+// TODO :peut etre utiliser OnceCell sur ces variables... a discuter
+
 pub const JWT_TTL: i64 = 60 * 60 * 60 * 24; // 1 day
 pub const JWT_AUDIENCE: &str = "dydyscord-client"; // TODO change
 pub const JWT_SECRET_KEY: OnceCell<String> = OnceCell::new(); // TODO change

@@ -1,0 +1,46 @@
+use inquire_derive::Selectable;
+use std::fmt;
+
+#[derive(Debug, Copy, Clone, Selectable)]
+pub enum LoggedOutChoice {
+    Signup,
+    Login,
+    Quit,
+}
+
+impl fmt::Display for LoggedOutChoice {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LoggedOutChoice::Signup => write!(f, "Sign Up"),
+            LoggedOutChoice::Login => write!(f, "Log In"),
+            LoggedOutChoice::Quit => write!(f, "Quit"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Selectable)]
+pub enum LoggedInChoice {
+    Test,
+    Logout,
+}
+
+impl fmt::Display for LoggedInChoice {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LoggedInChoice::Test => write!(f, "Test"),
+            LoggedInChoice::Logout => write!(f, "Log Out"),
+        }
+    }
+}
+
+pub fn prompt_logged_out() -> LoggedOutChoice {
+    LoggedOutChoice::select("Choose an option:")
+        .prompt()
+        .expect("An error occurred")
+}
+
+pub fn prompt_logged_in() -> LoggedInChoice {
+    LoggedInChoice::select("Choose an option:")
+        .prompt()
+        .expect("An error occurred")
+}

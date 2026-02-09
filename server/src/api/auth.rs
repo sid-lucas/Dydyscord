@@ -1,3 +1,4 @@
+use crate::api::jwt::create_jwt;
 use crate::config::ServerState;
 use crate::opaque::DefaultCipherSuite as DCS;
 use crate::opaque::models::{
@@ -205,6 +206,7 @@ pub async fn login_finish(
     State(mut state): State<ServerState>,
     Json(payload): Json<LoginFinishRequest>,
 ) -> Result<StatusCode, StatusCode> {
+    // Création de la clé avec le nonce
     let redis_key = format!("opaque:login:{}", payload.nonce);
 
     // Récupération du server_login_state depuis Redis
@@ -214,11 +216,10 @@ pub async fn login_finish(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // TODO : PK???
-    // Si le nonce inconnu / expiré
+    // Si la récupération n'a pas fonctionné (nonce invalide)
     let state_bytes: Vec<u8> = match state_bytes {
         Some(v) => v,
-        None => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+        None => return Err(StatusCode::UNAUTHORIZED),
     };
 
     // Supprimer one-shot (évite replay)
@@ -245,6 +246,9 @@ pub async fn login_finish(
 
     // secret partagé entre le client et le serveur
     let _session_key = finish.session_key;
+
+    // TODO Créer token ? mais on peut seulement avec user_id si on le récup.
+    // et il faudrait plutot faire un token avec device_id je crois...
 
     Ok(StatusCode::OK)
 }
