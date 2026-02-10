@@ -1,6 +1,8 @@
 use crate::config::constant;
 use crate::config::server::ServerState;
-use axum::{extract::Request, extract::State, http::StatusCode, middleware::Next, response::Response};
+use axum::{
+    extract::Request, extract::State, http::StatusCode, middleware::Next, response::Response,
+};
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use secrecy::ExposeSecret;
@@ -131,7 +133,13 @@ pub async fn verify_jwt_access(
     req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    verify_jwt_with_type(req, next, TokenType::Access, state.jwt_key.expose_secret()).await
+    verify_jwt_with_type(
+        req,
+        next,
+        TokenType::Access,
+        state.jwt_key().expose_secret(),
+    )
+    .await
 }
 
 pub async fn verify_jwt_auth(
@@ -139,5 +147,5 @@ pub async fn verify_jwt_auth(
     req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    verify_jwt_with_type(req, next, TokenType::Auth, state.jwt_key.expose_secret()).await
+    verify_jwt_with_type(req, next, TokenType::Auth, state.jwt_key().expose_secret()).await
 }

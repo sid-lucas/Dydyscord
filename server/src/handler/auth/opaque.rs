@@ -95,7 +95,7 @@ pub async fn register_start(
 
     // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
     let username = payload.username;
-    let login_lookup = login_lookup(&state.pepper.expose_secret(), &username);
+    let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
 
     // Check si l'utilisateur existe déjà dans la BDD
     let user = sqlx::query_as!(
@@ -119,7 +119,7 @@ pub async fn register_start(
 
     // Démarrer le register server avec OPAQUE
     let start = ServerRegistration::<DCS>::start(
-        &state.opaque_setup,
+        &state.opaque_setup(),
         start_register_request,
         login_lookup.as_slice(),
     )
@@ -156,7 +156,7 @@ pub async fn register_finish(
     // Récupération du nom d'utilisateur
     let username = payload.username;
     // Recalculer le login_lookup avec le server_pepper et username
-    let login_lookup = login_lookup(&state.pepper.expose_secret(), &username);
+    let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
 
     // Stocker le opaque_record dans la BDD associé au login_lookup
     sqlx::query!(
@@ -187,7 +187,7 @@ pub async fn login_start(
 
     // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
     let username = payload.username;
-    let login_lookup = login_lookup(&state.pepper.expose_secret(), &username);
+    let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
 
     // Récupération du user correspondant au login_lookup dans la BDD
     let user = sqlx::query_as!(
@@ -217,7 +217,7 @@ pub async fn login_start(
     // Démarrer le login server avec OPAQUE
     let start = ServerLogin::start(
         &mut server_rng,
-        &state.opaque_setup,
+        &state.opaque_setup(),
         opaque_record,
         start_login_request,
         login_lookup.as_slice(),
@@ -230,7 +230,7 @@ pub async fn login_start(
     let state_bytes: Vec<u8> = start.state.serialize().to_vec();
     let ttl_seconds: u64 = 120;
     let _: () = state
-        .redis
+        .redis()
         .set_ex(&redis_key, state_bytes, ttl_seconds)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -257,7 +257,7 @@ pub async fn login_finish(
 
     // Récupération du server_login_state depuis Redis
     let state_bytes: Option<Vec<u8>> = state
-        .redis
+        .redis()
         .get(&redis_key)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -270,7 +270,7 @@ pub async fn login_finish(
 
     // Supprimer one-shot (évite replay)
     let _: () = state
-        .redis
+        .redis()
         .del(&redis_key)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -298,7 +298,7 @@ pub async fn login_finish(
     let token = jwt::create_jwt(
         id.as_str(),
         jwt::TokenType::Auth,
-        &state.jwt_key.expose_secret(),
+        &state.jwt_key().expose_secret(),
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

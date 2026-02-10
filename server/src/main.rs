@@ -15,7 +15,7 @@ async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
-    let server_state = server::init_server_state().await;
+    let server_state = server::ServerState::new().await;
 
     let app = Router::new()
         // Routes protégées par un JWT Access:
@@ -26,7 +26,7 @@ async fn main() {
         .route(
             "/device",
             post(handler::auth::device::create_device).layer(middleware::from_fn_with_state(
-                server_state.clone(),
+                server_state,
                 handler::auth::jwt::verify_jwt_auth,
             )),
         )
