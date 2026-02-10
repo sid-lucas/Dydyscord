@@ -15,7 +15,7 @@ pub async fn create_device(
         r#"INSERT INTO devices (user_id) VALUES ($1) RETURNING id, user_id, created_at, updated_at"#,
         user_id
     )
-    .fetch_one(&state.pool)
+    .fetch_one(&state.pool())
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

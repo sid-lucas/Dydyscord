@@ -41,20 +41,20 @@ impl ServerState {
     }
 
     // Getter
-    pub fn pool(self) -> PgPool {
-        self.pool
+    pub fn pool(&self) -> PgPool {
+        self.pool.clone()
     }
-    pub fn redis(self) -> ConnectionManager {
-        self.redis
+    pub fn redis(&self) -> ConnectionManager {
+        self.redis.clone()
     }
-    pub fn opaque_setup(self) -> Arc<ServerSetup<OpaqueCiphersuite>> {
-        self.opaque_setup
+    pub fn opaque_setup(&self) -> Arc<ServerSetup<OpaqueCiphersuite>> {
+        self.opaque_setup.clone()
     }
-    pub fn pepper(self) -> Arc<SecretSlice<u8>> {
-        self.pepper
+    pub fn pepper(&self) -> Arc<SecretSlice<u8>> {
+        self.pepper.clone()
     }
-    pub fn jwt_key(self) -> Arc<SecretSlice<u8>> {
-        self.jwt_key
+    pub fn jwt_key(&self) -> Arc<SecretSlice<u8>> {
+        self.jwt_key.clone()
     }
 
     // Init

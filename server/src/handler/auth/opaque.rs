@@ -107,7 +107,7 @@ pub async fn register_start(
         "#,
         login_lookup,
     )
-    .fetch_optional(&state.pool)
+    .fetch_optional(&state.pool())
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -164,7 +164,7 @@ pub async fn register_finish(
         login_lookup,
         opaque_record,
     )
-    .execute(&state.pool)
+    .execute(&state.pool())
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -200,7 +200,7 @@ pub async fn login_start(
         login_lookup,
     )
     // fetch_optional pour ne pas révéler l'existence / non-existence d'un user
-    .fetch_optional(&state.pool)
+    .fetch_optional(&state.pool())
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -249,7 +249,7 @@ pub async fn login_start(
 }
 
 pub async fn login_finish(
-    State(mut state): State<ServerState>,
+    State(state): State<ServerState>,
     Json(payload): Json<LoginFinishRequest>,
 ) -> Result<CookieJar, StatusCode> {
     // Création de la clé avec le user_id
@@ -298,7 +298,7 @@ pub async fn login_finish(
     let token = jwt::create_jwt(
         id.as_str(),
         jwt::TokenType::Auth,
-        &state.jwt_key().expose_secret(),
+        state.jwt_key().expose_secret(),
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

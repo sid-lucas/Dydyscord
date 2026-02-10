@@ -5,6 +5,7 @@ use axum::{
 };
 use config::constant;
 use handler::auth;
+use std::sync::Arc;
 
 mod config;
 mod database;
@@ -26,7 +27,7 @@ async fn main() {
         .route(
             "/device",
             post(handler::auth::device::create_device).layer(middleware::from_fn_with_state(
-                server_state,
+                server_state.clone(),
                 handler::auth::jwt::verify_jwt_auth,
             )),
         )
