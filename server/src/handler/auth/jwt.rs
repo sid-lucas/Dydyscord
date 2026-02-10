@@ -1,10 +1,9 @@
+use crate::config::constant;
 use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
-use crate::constants;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum TokenType {
@@ -27,12 +26,12 @@ pub struct Claims {
 impl Claims {
     pub fn new(sub: &str, typ: TokenType) -> Self {
         let now = Utc::now().timestamp();
-        let ttl = constants::JWT_TTL;
+        let ttl = constant::JWT_TTL;
 
         Claims {
             sub: sub.to_string(),
             typ,
-            aud: constants::JWT_AUDIENCE.to_string(),
+            aud: constant::JWT_AUDIENCE.to_string(),
             exp: (now + ttl) as usize,
             iat: now as usize,
             jti: Uuid::new_v4(),
@@ -77,7 +76,7 @@ pub fn create_jwt(sub: &str, typ: TokenType) -> Result<String, jsonwebtoken::err
     jsonwebtoken::encode::<Claims>(
         &header,
         &claims,
-        &EncodingKey::from_secret(constants::JWT_SECRET_KEY.get().unwrap().as_ref()),
+        &EncodingKey::from_secret(constant::JWT_SECRET_KEY.get().unwrap().as_ref()),
     )
 }
 
@@ -97,17 +96,17 @@ pub async fn verify_jwt_with_type(
     let token = cookie
         .split(';')
         .map(|cookie: &str| cookie.trim())
-        .find_map(|cookie: &str| cookie.strip_prefix(constants::AUTH_HEADER))
+        .find_map(|cookie: &str| cookie.strip_prefix(constant::AUTH_HEADER))
         .map(|token: &str| token.trim_start_matches('=').trim())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let mut validation = Validation::new(Algorithm::HS256);
-    validation.set_audience(&[constants::JWT_AUDIENCE]);
+    validation.set_audience(&[constant::JWT_AUDIENCE]);
 
     // Decode token + signature OK + checks de claims (selon Validation)
     let decoded = jsonwebtoken::decode::<Claims>(
         token,
-        &DecodingKey::from_secret(constants::JWT_SECRET_KEY.get().unwrap().as_ref()),
+        &DecodingKey::from_secret(constant::JWT_SECRET_KEY.get().unwrap().as_ref()),
         &validation,
     );
 

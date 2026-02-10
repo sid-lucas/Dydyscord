@@ -1,27 +1,77 @@
-use crate::api::jwt;
-use crate::config::ServerState;
-use crate::constants;
-use crate::opaque::DefaultCipherSuite as DCS;
-use crate::opaque::models::{
-    LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
-    RegisterStartRequest, RegisterStartResponse,
-};
+use DefaultCipherSuite as DCS;
+use base64::Engine;
+use opaque_ke::CipherSuite;
+use opaque_ke::ServerSetup;
+use opaque_ke::argon2::Argon2;
+use rand::rngs::OsRng;
+
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::auth::jwt;
+use crate::config::server::ServerState;
+use crate::constant;
 
 use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 
-use base64::Engine;
 use hmac::Mac;
 use opaque_ke::{
     CredentialFinalization, CredentialRequest, RegistrationRequest, RegistrationUpload,
     ServerLogin, ServerLoginParameters, ServerRegistration,
 };
 use rand::RngCore;
-use rand::rngs::OsRng;
 use redis::AsyncCommands;
 use secrecy::ExposeSecret;
 
-use crate::database::models::User;
+use crate::database::model::User;
+
+// Register
+
+#[derive(Deserialize, Debug)]
+pub struct RegisterStartRequest {
+    pub username: String,
+    pub start_register_request: String, // base64
+}
+
+#[derive(Serialize)]
+pub struct RegisterStartResponse {
+    pub start_register_response: String, // base64
+}
+
+#[derive(Deserialize)]
+pub struct RegisterFinishRequest {
+    pub username: String,
+    pub finish_register_request: String, // base64
+}
+
+// Login
+
+#[derive(Deserialize)]
+pub struct LoginStartRequest {
+    pub username: String,
+    pub start_login_request: String, // base64
+}
+
+#[derive(Serialize)]
+pub struct LoginStartResponse {
+    pub start_login_response: String, // base64
+    pub user_id: Uuid, // aussi utilisé comme clé-valeur pour retrouver le server_login_state
+}
+
+#[derive(Deserialize)]
+pub struct LoginFinishRequest {
+    pub finish_login_request: String, // base64
+    pub user_id: String,              // clé-valeur pour retrouver le server_login_state
+}
+
+pub struct DefaultCipherSuite;
+
+impl CipherSuite for DefaultCipherSuite {
+    type OprfCs = opaque_ke::Ristretto255;
+    type KeyExchange = opaque_ke::TripleDh<opaque_ke::Ristretto255, sha2::Sha512>;
+    type Ksf = Argon2<'static>;
+}
 
 fn login_lookup(pepper: &[u8], username: &str) -> Vec<u8> {
     let normalized = username.trim().to_lowercase();
@@ -250,7 +300,7 @@ pub async fn login_finish(
     let token = jwt::create_jwt(id.as_str(), jwt::TokenType::Auth)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let cookie = Cookie::build((constants::AUTH_HEADER, token))
+    let cookie = Cookie::build((constant::AUTH_HEADER, token))
         .http_only(false) // TODO change
         .secure(false) // TODO Change: true interdit l'envoi un HTTP. -> false pour test local pour l'instant.
         .same_site(SameSite::Strict)

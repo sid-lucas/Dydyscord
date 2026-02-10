@@ -1,15 +1,15 @@
-use crate::config::init_server_state;
+use crate::config::server::{self};
 use axum::{
     Router, middleware,
     routing::{get, post},
 };
+use config::{constant, server::ServerState};
 use dotenv::dotenv;
+use handler::{auth, root};
 
-mod api;
 mod config;
-mod constants;
 mod database;
-mod opaque;
+mod handler;
 
 #[tokio::main]
 async fn main() {
@@ -18,29 +18,36 @@ async fn main() {
 
     dotenv().ok();
     let secret = std::env::var("JWT_SECRET_KEY").expect("JWT_SECRET_KEY must be set");
-    constants::JWT_SECRET_KEY
+    constant::JWT_SECRET_KEY
         .set(secret)
         .expect("JWT_SECRET_KEY already set");
 
-    let server_state = init_server_state().await;
+    let server_state = server::init_server_state().await;
 
     let app = Router::new()
         // Routes protégées par authentification (nécessite login):
         .route(
             "/device",
-            post(api::device::create_device).layer(middleware::from_fn(api::jwt::verify_jwt_auth)),
+            post(handler::auth::device::create_device)
+                .layer(middleware::from_fn(handler::auth::jwt::verify_jwt_auth)),
         )
         // Routes ouvertes :
-        .route("/", get(api::root))
-        .route("/register/start", post(api::auth::register_start))
-        .route("/register/finish", post(api::auth::register_finish))
-        .route("/login/start", post(api::auth::login_start))
-        .route("/login/finish", post(api::auth::login_finish))
+        .route("/", get(handler::root::root))
+        .route(
+            "/register/start",
+            post(handler::auth::opaque::register_start),
+        )
+        .route(
+            "/register/finish",
+            post(handler::auth::opaque::register_finish),
+        )
+        .route("/login/start", post(handler::auth::opaque::login_start))
+        .route("/login/finish", post(handler::auth::opaque::login_finish))
         .with_state(server_state);
 
-    let listener = tokio::net::TcpListener::bind(constants::SERVER_ADDR)
+    let listener = tokio::net::TcpListener::bind(constant::SERVER_ADDR)
         .await
         .unwrap();
-    println!("🚀 Listening on {}", constants::SERVER_ADDR);
+    println!("🚀 Listening on {}", constant::SERVER_ADDR);
     let _ = axum::serve(listener, app).await;
 }

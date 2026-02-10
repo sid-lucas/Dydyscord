@@ -1,6 +1,6 @@
-use crate::api::jwt::Claims;
-use crate::config::ServerState;
-use crate::database::models::Device;
+use crate::config::server::ServerState;
+use crate::database::model::Device;
+use crate::handler::auth::jwt::Claims;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use uuid::Uuid;
 
