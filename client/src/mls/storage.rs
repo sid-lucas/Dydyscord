@@ -84,11 +84,29 @@ pub fn db_exists() -> bool {
     dir.exists() && db.exists()
 }
 
+#[derive(Debug)]
+pub enum DbKeyStatus {
+    Present,
+    Missing,
+    Unavailable(String),
+}
+
+pub fn db_key_status(user_id: &str) -> DbKeyStatus {
+    let account = user_id.to_string();
+    let entry = match keyring::Entry::new(constants::KEYRING_SERVICE_NAME, &account) {
+        Ok(entry) => entry,
+        Err(err) => return DbKeyStatus::Unavailable(err.to_string()),
+    };
+
+    match entry.get_password() {
+        Ok(_) => DbKeyStatus::Present,
+        Err(keyring::Error::NoEntry) => DbKeyStatus::Missing,
+        Err(err) => DbKeyStatus::Unavailable(err.to_string()),
+    }
+}
+
 pub fn db_key_exists(user_id: &str) -> bool {
-    let account = format!("{user_id}");
-    keyring::Entry::new("dydyscord", &account)
-        .and_then(|e| e.get_password())
-        .is_ok()
+    matches!(db_key_status(user_id), DbKeyStatus::Present)
 }
 
 pub fn purge_db() {
@@ -103,13 +121,19 @@ pub fn get_or_create_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32]
         .map_err(|_| ClientError::Keyring)?;
 
     // Essayer de récupérer la db_key si existe dans la keychain
-    if let Ok(wrapped_b64) = entry.get_password() {
-        let wrapped = base64::engine::general_purpose::STANDARD
-            .decode(wrapped_b64)
-            .map_err(|_| ClientError::Internal)?;
-        let db_key =
-            crypto::unwrap_db_key(export_key, &wrapped).map_err(|_| ClientError::Internal)?;
-        return Ok(db_key);
+    match entry.get_password() {
+        Ok(wrapped_b64) => {
+            let wrapped = base64::engine::general_purpose::STANDARD
+                .decode(wrapped_b64)
+                .map_err(|_| ClientError::Internal)?;
+            let db_key =
+                crypto::unwrap_db_key(export_key, &wrapped).map_err(|_| ClientError::Internal)?;
+            return Ok(db_key);
+        }
+        Err(keyring::Error::NoEntry) => {
+            // Si n'existe pas, continue en dessous pour l'ajouter dans la keychain
+        }
+        Err(_) => return Err(ClientError::Keyring),
     }
 
     // Sinon créer + wrap + store dans la keychain
