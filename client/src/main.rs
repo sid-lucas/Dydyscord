@@ -44,8 +44,8 @@ fn handle_logged_in(session: Session) -> Option<AppState> {
             Some(AppState::LoggedIn(session))
         }
         choice::LoggedInChoice::Logout => {
-            // TODO CLEAR session
-            println!("need to clear the actual session then proceed.");
+            drop(session);
+            println!("Logged out.");
             Some(AppState::LoggedOut)
         }
     }

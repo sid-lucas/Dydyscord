@@ -149,10 +149,6 @@ pub fn reconcile_device_storage(user_id: &str) -> bool {
         purge_storage(user_id);
     }
 
-    //TODO : remove, Print de debug
-    println!("has_key : {}", has_key);
-    println!("has_db : {}", has_db);
-
     has_db && has_key
 }
 
