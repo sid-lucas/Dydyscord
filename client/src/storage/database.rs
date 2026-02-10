@@ -4,6 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::{env, fs, path::PathBuf};
 
 use crate::config::constant;
+use crate::error::AppError;
 use crate::storage::{crypto, error::StorageError};
 use crate::transport::http;
 
@@ -153,10 +154,10 @@ pub fn reconcile_device_storage(user_id: &str) -> bool {
     has_db && has_key
 }
 
-pub fn get_provider_info(
+pub fn initialize_device_storage(
     user_id: &str,
     export_key: &[u8],
-) -> Result<([u8; 32], String), StorageError> {
+) -> Result<([u8; 32], String), AppError> {
     // Reconcile + récupère si le device est reconnu avant potentielle init de la db
     let new_device = !reconcile_device_storage(&user_id.to_string());
 
@@ -165,7 +166,7 @@ pub fn get_provider_info(
 
     if new_device {
         // TODO : CREER LES TYPES OPENMLS NECESSAIRES ET STOCKER DANS LA DB LOCALE
-        let device_id = http::create_device().map_err(|_| StorageError::CodecSerde)?;
+        let device_id = http::create_device()?;
         Ok((db_key, device_id))
     } else {
         //

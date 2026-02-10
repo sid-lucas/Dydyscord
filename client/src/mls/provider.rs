@@ -1,11 +1,13 @@
-use crate::mls::error::MlsError;
 use openmls_rust_crypto::RustCrypto;
 use openmls_sqlite_storage::{Connection, SqliteStorageProvider};
 use openmls_traits::OpenMlsProvider;
 
-use crate::storage::{
-    database::{self, CBORCodec},
-    error::StorageError,
+use crate::{
+    error::AppError,
+    storage::{
+        database::{self, CBORCodec},
+        error::StorageError,
+    },
 };
 
 pub struct MyProvider {
@@ -30,15 +32,12 @@ impl OpenMlsProvider for MyProvider {
     }
 }
 
-pub fn prepare_provider(db_key: &[u8; 32], user_id: &str) -> Result<MyProvider, StorageError> {
-    let conn =
-        database::open_sqlcipher(db_key, user_id).map_err(|_| StorageError::DatabaseConnection)?;
+pub fn prepare_provider(db_key: &[u8; 32], user_id: &str) -> Result<MyProvider, AppError> {
+    let conn = database::open_sqlcipher(db_key, user_id)?;
 
     let mut storage = SqliteStorageProvider::<CBORCodec, _>::new(conn);
 
-    storage
-        .run_migrations()
-        .map_err(|_| StorageError::Migration)?;
+    storage.run_migrations()?;
     Ok(MyProvider {
         crypto: RustCrypto::default(),
         rand: RustCrypto::default(),

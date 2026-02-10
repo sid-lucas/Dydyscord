@@ -1,6 +1,7 @@
 use DefaultCipherSuite as DCS;
 use base64::Engine;
 
+use crate::error::AppError;
 use crate::transport::{error::TransportError, http};
 use opaque_ke::argon2::Argon2;
 use opaque_ke::{
@@ -11,7 +12,9 @@ use rand::rngs::OsRng;
 use std::{thread, time::Duration};
 use uuid::Uuid;
 
+use crate::auth::error::AuthError;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 
 // Register
 
@@ -66,12 +69,12 @@ pub struct LoginResult {
     pub session_key: Vec<u8>,
 }
 
-pub fn register(username: &str, password: &str) -> Result<(), TransportError> {
+pub fn register(username: &str, password: &str) -> Result<(), AppError> {
     let mut client_rng = OsRng;
 
     // Démarrer le register client avec OPAQUE
     let start = ClientRegistration::<DCS>::start(&mut client_rng, &password.as_bytes())
-        .expect("Failed to start client registration");
+        .map_err(|_| AuthError("Error starting client registration"))?;
 
     // Préparation de la request à envoyer au serveur
     let start_register_request =
@@ -81,30 +84,22 @@ pub fn register(username: &str, password: &str) -> Result<(), TransportError> {
     let response = http::opaque_register(RegisterStartRequest {
         username: &username,
         start_register_request,
-    });
-    let register_response_b64 = match response {
-        Ok(response) => response.start_register_response,
-        Err(e) => return Err(e.into()),
-    };
+    })?;
+    let register_response_b64 = response.start_register_response;
 
     // Response base64 -> bytes
-    let register_response_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&register_response_b64)
-        .expect("Failed to decode base64 register response");
+    let register_response_bytes =
+        base64::engine::general_purpose::STANDARD.decode(&register_response_b64)?;
     // Response désérialisation
-    let register_response = RegistrationResponse::<DCS>::deserialize(&register_response_bytes)
-        .expect("Failed to deserialize register response");
+    let register_response = RegistrationResponse::<DCS>::deserialize(&register_response_bytes)?;
 
     // Démarrer le finish avec la réponse du serveur
-    let finish = start
-        .state
-        .finish(
-            &mut client_rng,
-            &password.as_bytes(),
-            register_response,
-            ClientRegistrationFinishParameters::default(),
-        )
-        .expect("Failed to finish client registration");
+    let finish = start.state.finish(
+        &mut client_rng,
+        &password.as_bytes(),
+        register_response,
+        ClientRegistrationFinishParameters::default(),
+    )?;
 
     // Préparation de la request à envoyer au serveur
     let finish_register_request =
@@ -114,8 +109,7 @@ pub fn register(username: &str, password: &str) -> Result<(), TransportError> {
     http::opaque_register_finish(RegisterFinishRequest {
         username: &username,
         finish_register_request,
-    })
-    .map_err(|e| e.into())?;
+    })?;
 
     // TODO : utiliser
     // CA c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
@@ -125,12 +119,11 @@ pub fn register(username: &str, password: &str) -> Result<(), TransportError> {
     Ok(())
 }
 
-pub fn login(username: &str, password: &str) -> Result<LoginResult, TransportError> {
+pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     let mut client_rng = OsRng;
 
     // Démarrer le login client avec OPAQUE
-    let start = ClientLogin::<DCS>::start(&mut client_rng, &password.as_bytes())
-        .expect("Failed to start client login");
+    let start = ClientLogin::<DCS>::start(&mut client_rng, &password.as_bytes())?;
 
     // Préparation de la request à envoyer au serveur
     let start_login_request =
@@ -144,30 +137,22 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, TransportErr
     let response = http::opaque_login(LoginStartRequest {
         username: &username,
         start_login_request,
-    });
-    let (login_response_b64, id) = match response {
-        Ok(response) => (response.start_login_response, response.user_id),
-        Err(e) => return Err(e.into()),
-    };
+    })?;
+    let (login_response_b64, id) = (response.start_login_response, response.user_id);
 
     // Response base64 -> bytes
-    let login_response_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&login_response_b64)
-        .expect("Failed to decode base64 login response");
+    let login_response_bytes =
+        base64::engine::general_purpose::STANDARD.decode(&login_response_b64)?;
     // Response désérialisation
-    let login_response = CredentialResponse::<DCS>::deserialize(&login_response_bytes)
-        .expect("Failed to deserialize login response");
+    let login_response = CredentialResponse::<DCS>::deserialize(&login_response_bytes)?;
 
     // Finaliser le login avec la réponse du serveur
-    let finish = start
-        .state
-        .finish(
-            &mut client_rng,
-            &password.as_bytes(),
-            login_response,
-            ClientLoginFinishParameters::default(),
-        )
-        .map_err(|_| TransportError::LoginFailed)?;
+    let finish = start.state.finish(
+        &mut client_rng,
+        &password.as_bytes(),
+        login_response,
+        ClientLoginFinishParameters::default(),
+    )?;
 
     let export_key = finish.export_key.to_vec();
     let session_key = finish.session_key.to_vec();
@@ -180,8 +165,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, TransportErr
     http::opaque_login_finish(LoginFinishRequest {
         finish_login_request,
         user_id: id,
-    })
-    .map_err(|e| e.into())?;
+    })?;
 
     Ok(LoginResult {
         id,

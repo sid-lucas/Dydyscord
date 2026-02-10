@@ -1,5 +1,6 @@
 mod auth;
 mod config;
+mod error;
 mod mls;
 mod storage;
 mod transport;
@@ -89,7 +90,16 @@ fn login() -> Option<AppState> {
         }
     };
 
-    
+    let (db_key, device_id) = match database::initialize_device_storage(
+        &session.user_id.to_string(),
+        &session.export_key,
+    ) {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("Device storage initialization failed: {e}");
+            return Some(AppState::LoggedOut);
+        }
+    };
 
     // Ouverture de la connexion de la db et préparation du provider OpenMLS
     session.set_provider(&db_key, &session.user_id.to_string());
