@@ -2,6 +2,7 @@ use crate::auth::opaque::LoginResult;
 use crate::error::AppError;
 use crate::mls::provider::{self, MyProvider};
 use uuid::Uuid;
+use zeroize::Zeroize;
 
 pub enum AppState {
     LoggedOut,
@@ -29,8 +30,26 @@ impl Session {
         }
     }
 
+    // Clear propre des secrets en mémoire
+    pub fn clear(&mut self) {
+        self.export_key.zeroize();
+        self.export_key.clear();
+        self.session_key.zeroize();
+        self.session_key.clear();
+        if let Some(mut key) = self.db_key.take() {
+            key.zeroize();
+            key.clear();
+        }
+    }
+
     pub fn set_provider(&mut self, db_key: &[u8; 32], user_id: &str) -> Result<(), AppError> {
         self.provider = Some(provider::prepare_provider(db_key, user_id)?);
         Ok(())
+    }
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        self.clear();
     }
 }

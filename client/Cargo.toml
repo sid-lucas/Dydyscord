@@ -27,3 +27,4 @@ rusqlite = { version = "0.32.1", features = [
     "bundled-sqlcipher-vendored-openssl",
 ] }
 keyring = { version = "3.6.3", features = ["linux-native"] }
+zeroize = "1.8.2"
