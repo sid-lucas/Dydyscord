@@ -22,30 +22,29 @@ impl openmls_sqlite_storage::Codec for CBORCodec {
     fn to_vec<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, Self::Error> {
         let mut out = Vec::new();
         ciborium::ser::into_writer(value, &mut out)
-            .map_err(|_| StorageError("CBOR codec serialize"))?;
+            .map_err(|_| StorageError::SerializeCborCodec)?;
         Ok(out)
     }
 
     fn from_slice<T: serde::de::DeserializeOwned>(slice: &[u8]) -> Result<T, Self::Error> {
-        let mut input =
-            ciborium::de::from_reader(slice).map_err(|_| StorageError("CBOR codec deserialize"))?;
+        let input =
+            ciborium::de::from_reader(slice).map_err(|_| StorageError::DeserializeCborCodec)?;
         Ok(input)
     }
 }
 
 pub fn open_sqlcipher(db_key: &[u8; 32], user_id: &str) -> Result<Connection, StorageError> {
     let db_path = ensure_db(user_id, constant::DB_EXTENSION)?;
-    let conn = Connection::open(db_path)
-        .map_err(|_| StorageError("could not establish database sqlite connection"))?;
+    let conn = Connection::open(db_path).map_err(|_| StorageError::ConnectDatabase)?;
 
     let key_string = base64::engine::general_purpose::STANDARD.encode(db_key);
     conn.pragma_update(None, "key", &key_string)
-        .map_err(|_| StorageError("could not read database (invalid key or corrupted file)"))?;
+        .map_err(|_| StorageError::ReadDatabase)?;
     Ok(conn)
 }
 
 pub fn ensure_app_dir() -> Result<PathBuf, StorageError> {
-    let home = env::var("HOME").expect("HOME not set");
+    let home = env::var("HOME").expect("HOME not set"); // TODO : CONST
 
     // Chemin jusqu'au dossier de l'app
     let mut path_app_dir = PathBuf::from(home);
@@ -54,12 +53,11 @@ pub fn ensure_app_dir() -> Result<PathBuf, StorageError> {
 
     // Créer le dossier de l'app si non existant
     if !path_app_dir.exists() {
-        fs::create_dir_all(&path_app_dir)
-            .map_err(|_| StorageError("could not create directory app"))?;
+        fs::create_dir_all(&path_app_dir).map_err(|_| StorageError::CreateAppDirectory)?;
     }
     // S'assure d'appliquer permissions restrictives même si le dossier existe déjà
     fs::set_permissions(&path_app_dir, fs::Permissions::from_mode(0o700))
-        .map_err(|_| StorageError("could not set directory app permissions"))?;
+        .map_err(|_| StorageError::SetAppDirectoryPermissions)?;
 
     // Retourne le chemin jusqu'à l'app dir
     Ok(path_app_dir)
@@ -74,25 +72,23 @@ pub fn ensure_db(user_id: &str, extension: &str) -> Result<PathBuf, StorageError
 
     // Créer le fichier db si non existant
     if !path_db_file.exists() {
-        fs::File::create(&path_db_file)
-            .map_err(|_| StorageError("could not create storage file"))?;
+        fs::File::create(&path_db_file).map_err(|_| StorageError::CreateStorageFile)?;
     }
     // S'assure d'appliquer permissions restrictives même si le fichier existe déjà
     fs::set_permissions(&path_db_file, fs::Permissions::from_mode(0o600))
-        .map_err(|_| StorageError("could not set storage file permissions"))?;
-
+        .map_err(|_| StorageError::SetStorageFilePermissions)?;
     Ok(path_db_file)
 }
 
 pub fn file_path(user_id: &str, extension: &str) -> PathBuf {
-    let home = env::var("HOME").expect("HOME not set");
+    let home = env::var("HOME").expect("HOME not set"); // TODO : CONST
     let path = PathBuf::from(home).join(format!(".{}", constant::APP_NAME));
     let file_name = format!("{user_id}{extension}");
     path.join(file_name)
 }
 
 pub fn file_exists(user_id: &str, extension: &str) -> bool {
-    let home = env::var("HOME").expect("HOME not set");
+    let home = env::var("HOME").expect("HOME not set"); // TODO : CONST
     let path_dir = PathBuf::from(home).join(format!(".{}", constant::APP_NAME));
     let path_file = file_path(user_id, extension);
     path_dir.exists() && path_file.exists()
@@ -115,32 +111,29 @@ pub fn get_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], StorageE
     if file_exists(user_id, constant::DB_KEY_EXTENSION) {
         let key_path = file_path(user_id, constant::DB_KEY_EXTENSION);
         // TODO: Possible race condition entre le file_exists() et le read_to_string(), mais ignorée
-        let wrapped_b64 = fs::read_to_string(&key_path)
-            .map_err(|_| StorageError("could not read db key file"))?;
+        let wrapped_b64 = fs::read_to_string(&key_path).map_err(|_| StorageError::ReadDbKeyFile)?;
         let wrapped_b64 = wrapped_b64.trim();
 
         let wrapped = base64::engine::general_purpose::STANDARD
             .decode(wrapped_b64)
-            .map_err(|_| StorageError("could not decode db key"))?;
+            .map_err(|_| StorageError::DecodeDbKey)?;
 
-        let db_key = crypto::unwrap_db_key(export_key, &wrapped)
-            .map_err(|_| StorageError("could not unwrap db key"))?;
+        let db_key =
+            crypto::unwrap_db_key(export_key, &wrapped).map_err(|_| StorageError::UnwrapDbKey)?;
 
         return Ok(db_key);
     }
 
     // Sinon créer clé + wrap
     let db_key: [u8; 32] = rand::random();
-    let wrapped = crypto::wrap_db_key(export_key, &db_key)
-        .map_err(|_| StorageError("could not wrap db key"))?;
+    let wrapped = crypto::wrap_db_key(export_key, &db_key).map_err(|_| StorageError::WrapDbKey)?;
     let wrapped_b64 = base64::engine::general_purpose::STANDARD.encode(wrapped);
 
     // S'assurer de l'existence du fichier .key
     let key_path = ensure_db(user_id, constant::DB_KEY_EXTENSION)?;
 
     // Inscrire la db_key chiffrée dans le fichier
-    fs::write(&key_path, wrapped_b64)
-        .map_err(|_| StorageError("could not write db key in file"))?;
+    fs::write(&key_path, wrapped_b64).map_err(|_| StorageError::StoreDbKey)?;
 
     Ok(db_key)
 }

@@ -73,7 +73,7 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
 
     // Démarrer le register client avec OPAQUE
     let start = ClientRegistration::<DCS>::start(&mut client_rng, &password.as_bytes())
-        .map_err(|_| AuthError("Error starting client registration"))?;
+        .map_err(|_| AuthError::OpaqueRegisterStart)?;
 
     // Préparation de la request à envoyer au serveur
     let start_register_request =
@@ -89,10 +89,10 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
     // Response base64 -> bytes
     let register_response_bytes = base64::engine::general_purpose::STANDARD
         .decode(&register_response_b64)
-        .map_err(|_| AuthError("Error decoding base64 register response"))?;
+        .map_err(|_| AuthError::OpaqueDecode)?;
     // Response désérialisation
     let register_response = RegistrationResponse::<DCS>::deserialize(&register_response_bytes)
-        .map_err(|_| AuthError("Error deserializing register response"))?;
+        .map_err(|_| AuthError::OpaqueDeserialize)?;
 
     // Démarrer le finish avec la réponse du serveur
     let finish = start
@@ -103,7 +103,7 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
             register_response,
             ClientRegistrationFinishParameters::default(),
         )
-        .map_err(|_| AuthError("Error finishing client registration"))?;
+        .map_err(|_| AuthError::OpaqueRegisterFinish)?;
 
     // Préparation de la request à envoyer au serveur
     let finish_register_request =
@@ -118,7 +118,7 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
     // TODO : utiliser
     // CA c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
     // Uniquement connue du client.
-    let export_key = finish.export_key;
+    let _export_key = finish.export_key;
 
     Ok(())
 }
@@ -128,7 +128,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
 
     // Démarrer le login client avec OPAQUE
     let start = ClientLogin::<DCS>::start(&mut client_rng, &password.as_bytes())
-        .map_err(|_| AuthError("Error starting client login"))?;
+        .map_err(|_| AuthError::OpaqueLoginStart)?;
 
     // Préparation de la request à envoyer au serveur
     let start_login_request =
@@ -148,10 +148,10 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     // Response base64 -> bytes
     let login_response_bytes = base64::engine::general_purpose::STANDARD
         .decode(&login_response_b64)
-        .map_err(|_| AuthError("Error decoding base64 login response"))?;
+        .map_err(|_| AuthError::OpaqueDecode)?;
     // Response désérialisation
     let login_response = CredentialResponse::<DCS>::deserialize(&login_response_bytes)
-        .map_err(|_| AuthError("Error deserializing login response"))?;
+        .map_err(|_| AuthError::OpaqueDeserialize)?;
 
     // Finaliser le login avec la réponse du serveur
     let finish = start
@@ -162,7 +162,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
             login_response,
             ClientLoginFinishParameters::default(),
         )
-        .map_err(|_| AuthError("Error finishing client login"))?;
+        .map_err(|_| AuthError::OpaqueLoginFinish)?;
 
     let export_key = finish.export_key.to_vec();
     let session_key = finish.session_key.to_vec();

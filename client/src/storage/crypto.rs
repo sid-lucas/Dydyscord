@@ -16,7 +16,7 @@ pub fn unwrap_db_key(export_key: &[u8], wrapped: &[u8]) -> Result<[u8; 32], AppE
     let wrap_key = derive_wrap_key(export_key)?;
     let plain = decrypt_with_key(&wrap_key, wrapped)?;
     if plain.len() != 32 {
-        return Err(StorageError("unwrapped key length invalid").into());
+        return Err(StorageError::UnwrapDbKey.into());
     }
     let mut out = [0u8; 32];
     out.copy_from_slice(&plain);
@@ -28,7 +28,7 @@ fn derive_wrap_key(export_key: &[u8]) -> Result<[u8; 32], AppError> {
     let hk = Hkdf::<Sha256>::new(None, export_key);
     let mut out = [0u8; 32];
     hk.expand(b"db-key-wrap", &mut out)
-        .map_err(|_| StorageError("wrap key derive"))?;
+        .map_err(|_| StorageError::DeriveWrapKey)?;
     Ok(out)
 }
 
@@ -41,7 +41,7 @@ pub fn encrypt_with_key(key_bytes: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8
     let cipher = Aes256Gcm::new(key_bytes.into());
     let ciphertext = cipher
         .encrypt(&nonce, plaintext)
-        .map_err(|_| StorageError("wrap key encryption"))?;
+        .map_err(|_| StorageError::EncryptWithWrapKey)?;
 
     // envelope: version || nonce || ciphertext (tag inclus dans ct)
     let mut out = Vec::with_capacity(1 + 12 + ciphertext.len());
@@ -54,12 +54,12 @@ pub fn encrypt_with_key(key_bytes: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8
 pub fn decrypt_with_key(key_bytes: &[u8; 32], envelope: &[u8]) -> Result<Vec<u8>, AppError> {
     // Vérification taille minimale
     if envelope.len() < 1 + 12 {
-        return Err(StorageError("envelope length").into());
+        return Err(StorageError::InvalidEnvelopeLength.into());
     }
 
     // Vérification version
     if envelope[0] != 1u8 {
-        return Err(StorageError("envelope version").into());
+        return Err(StorageError::InvalidEnvelopeVersion.into());
     }
 
     // Extraction nonce et ciphertext
@@ -73,7 +73,7 @@ pub fn decrypt_with_key(key_bytes: &[u8; 32], envelope: &[u8]) -> Result<Vec<u8>
     let nonce = Nonce::from_slice(nonce_bytes);
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|_| StorageError("wrap key decryption"))?;
+        .map_err(|_| StorageError::DecryptWithWrapKey)?;
 
     Ok(plaintext)
 }

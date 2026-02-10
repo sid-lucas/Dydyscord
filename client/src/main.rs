@@ -8,8 +8,8 @@ mod ui;
 
 use auth::session::AppState;
 use auth::session::Session;
+use std::process::exit;
 use storage::database;
-use transport::http;
 use ui::choice;
 
 fn main() {
@@ -77,7 +77,7 @@ fn login() -> Option<AppState> {
         Ok((username, password)) => (username, password),
         Err(e) => {
             eprintln!("Login failed: {e}");
-            return None;
+            return Some(AppState::LoggedOut);
         }
     };
 
@@ -102,7 +102,7 @@ fn login() -> Option<AppState> {
     };
 
     // Ouverture de la connexion de la db et préparation du provider OpenMLS
-    session.set_provider(&db_key, &session.user_id.to_string());
+    let _ = session.set_provider(&db_key, &session.user_id.to_string());
 
     println!("Login successful!");
     Some(AppState::LoggedIn(session))

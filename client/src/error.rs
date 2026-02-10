@@ -47,9 +47,9 @@ impl From<UiError> for AppError {
 impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AppError::Auth(e) => write!(f, "Auth error: {}", e.0),
-            AppError::Mls(e) => write!(f, "MLS error: {}", e.0),
-            AppError::Storage(e) => write!(f, "Storage error: {}", e.0),
+            AppError::Auth(e) => write!(f, "Auth error: {}", e),
+            AppError::Mls(e) => write!(f, "MLS error: {}", e),
+            AppError::Storage(e) => write!(f, "Storage error: {}", e),
             AppError::Transport(e) => write!(f, "Transport error: {}", e),
             AppError::Ui(e) => write!(f, "UI error: {}", e),
         }

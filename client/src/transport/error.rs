@@ -17,9 +17,6 @@ pub enum TransportError {
     #[error("unauthorized access")]
     Unauthorized,
 
-    #[error("internal error")]
-    Internal,
-
     #[error("username already exists")]
     UsernameTaken,
 
