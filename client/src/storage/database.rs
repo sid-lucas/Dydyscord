@@ -6,18 +6,6 @@ use std::{env, fs, path::PathBuf};
 use crate::config::constant;
 use crate::storage::{crypto, error::StorageError};
 
-#[derive(thiserror::Error, Debug)]
-pub enum CodecError {
-    #[error("internal error")]
-    InternalError,
-    #[error("codec not initialized")]
-    NotInitialized,
-    #[error("serialize/deserialize error")]
-    Serde,
-    #[error("crypto error")]
-    Crypto,
-}
-
 pub struct CBORCodec;
 
 impl Default for CBORCodec {
@@ -27,16 +15,16 @@ impl Default for CBORCodec {
 }
 
 impl openmls_sqlite_storage::Codec for CBORCodec {
-    type Error = CodecError;
+    type Error = StorageError;
 
     fn to_vec<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, Self::Error> {
         let mut out = Vec::new();
-        ciborium::ser::into_writer(value, &mut out).map_err(|_| CodecError::Serde)?;
+        ciborium::ser::into_writer(value, &mut out).map_err(|_| StorageError::CodecSerde)?;
         Ok(out)
     }
 
     fn from_slice<T: serde::de::DeserializeOwned>(slice: &[u8]) -> Result<T, Self::Error> {
-        ciborium::de::from_reader(slice).map_err(|_| CodecError::Serde)
+        ciborium::de::from_reader(slice).map_err(|_| StorageError::CodecSerde)
     }
 }
 

@@ -34,4 +34,7 @@ pub enum StorageError {
 
     #[error("could not set restrictive permissions on storage file")]
     FilePermission,
+
+    #[error("could not serialize/deserialize")]
+    CodecSerde,
 }
