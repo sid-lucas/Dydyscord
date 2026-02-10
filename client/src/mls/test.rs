@@ -24,7 +24,8 @@ fn init_codec_key(key: [u8; 32]) {
 fn test() -> Result<(), String> {
     init_codec_key([42u8; 32]); // Clé fixe pour test
 
-    let db_path = storage::ensure_db();
+    let user_id = "ahahah";
+    let db_path = storage::ensure_db(user_id);
     let conn = Connection::open(db_path).map_err(|e| format!("open db: {e:?}"))?;
 
     let key_bytes = EXPORT_KEY.get().ok_or("export key not set")?;

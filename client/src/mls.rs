@@ -33,8 +33,8 @@ impl OpenMlsProvider for MyProvider {
     }
 }
 
-pub fn prepare_provider(db_key: &[u8; 32]) -> Result<MyProvider, ClientError> {
-    let conn = storage::open_sqlcipher(db_key)?;
+pub fn prepare_provider(db_key: &[u8; 32], user_id: &str) -> Result<MyProvider, ClientError> {
+    let conn = storage::open_sqlcipher(db_key, user_id)?;
 
     let mut storage = SqliteStorageProvider::<CBORCodec, _>::new(conn);
 

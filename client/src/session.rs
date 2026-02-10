@@ -1,5 +1,6 @@
 use uuid::Uuid;
 
+use crate::constants;
 use crate::error::ClientError;
 use crate::mls::{self, MyProvider, storage};
 use crate::opaque::auth::LoginResult;
@@ -25,8 +26,8 @@ impl Session {
         }
     }
 
-    pub fn set_provider(&mut self, db_key: &[u8; 32]) -> Result<(), ClientError> {
-        self.provider = Some(mls::prepare_provider(db_key)?);
+    pub fn set_provider(&mut self, db_key: &[u8; 32], user_id: &str) -> Result<(), ClientError> {
+        self.provider = Some(mls::prepare_provider(db_key, user_id)?);
         Ok(())
     }
 }
@@ -34,12 +35,12 @@ impl Session {
 // Check si existe deja une db + db_key (device existe)
 // ou si l'un manque (device non existant et purge si incohérence)
 pub fn reconcile_device_storage(user_id: &str) -> bool {
-    let has_key = storage::db_key_exists(user_id);
-    let has_db = storage::db_exists();
+    let has_db = storage::file_exists(user_id, constants::DB_EXTENSION);
+    let has_key = storage::file_exists(user_id, constants::DB_KEY_EXTENSION);
 
     // Si db présente mais pas la db_key -> considère la db comme corrompue/perdue donc purge
-    if has_db && !has_key {
-        let _ = storage::purge_db();
+    if !has_db || !has_key {
+        storage::purge_storage(user_id);
     }
 
     //TODO : remove, Print de debug

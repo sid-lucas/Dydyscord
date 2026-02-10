@@ -41,8 +41,8 @@ impl openmls_sqlite_storage::Codec for CBORCodec {
     }
 }
 
-pub fn open_sqlcipher(db_key: &[u8; 32]) -> Result<Connection, ClientError> {
-    let db_path = ensure_db();
+pub fn open_sqlcipher(db_key: &[u8; 32], user_id: &str) -> Result<Connection, ClientError> {
+    let db_path = ensure_db(user_id);
     let conn = Connection::open(db_path).map_err(|_| ClientError::Internal)?;
 
     let key_string = base64::engine::general_purpose::STANDARD.encode(db_key);
@@ -52,7 +52,7 @@ pub fn open_sqlcipher(db_key: &[u8; 32]) -> Result<Connection, ClientError> {
     Ok(conn)
 }
 
-pub fn ensure_db() -> PathBuf {
+pub fn ensure_db(user_id: &str) -> PathBuf {
     let home = env::var("HOME").expect("HOME not set");
 
     // Chemin jusqu'au dossier de l'app
@@ -66,7 +66,9 @@ pub fn ensure_db() -> PathBuf {
     }
 
     // Chemin jusqu'au fichier db sqlite
-    db.push(constants::DB_FILE);
+    let extension = constants::DB_EXTENSION;
+    let file_name = format!("{user_id}{extension}");
+    db.push(file_name);
 
     // Créer le fichier db si non existant
     if !db.exists() {
@@ -77,73 +79,66 @@ pub fn ensure_db() -> PathBuf {
     db
 }
 
-pub fn db_exists() -> bool {
+pub fn file_path(user_id: &str, extension: &str) -> PathBuf {
     let home = env::var("HOME").expect("HOME not set");
-    let dir = PathBuf::from(home).join(constants::APP_FOLDER);
-    let db = dir.join(constants::DB_FILE);
-    dir.exists() && db.exists()
+    let path = PathBuf::from(home).join(constants::APP_FOLDER);
+    let file_name = format!("{user_id}{extension}");
+    path.join(file_name)
 }
 
-#[derive(Debug)]
-pub enum DbKeyStatus {
-    Present,
-    Missing,
-    Unavailable(String),
+pub fn file_exists(user_id: &str, extension: &str) -> bool {
+    let home = env::var("HOME").expect("HOME not set");
+    let path_dir = PathBuf::from(home).join(constants::APP_FOLDER);
+    let path_file = file_path(user_id, extension);
+    path_dir.exists() && path_file.exists()
 }
 
-pub fn db_key_status(user_id: &str) -> DbKeyStatus {
-    let account = user_id.to_string();
-    let entry = match keyring::Entry::new(constants::KEYRING_SERVICE_NAME, &account) {
-        Ok(entry) => entry,
-        Err(err) => return DbKeyStatus::Unavailable(err.to_string()),
-    };
-
-    match entry.get_password() {
-        Ok(_) => DbKeyStatus::Present,
-        Err(keyring::Error::NoEntry) => DbKeyStatus::Missing,
-        Err(err) => DbKeyStatus::Unavailable(err.to_string()),
-    }
-}
-
-pub fn db_key_exists(user_id: &str) -> bool {
-    matches!(db_key_status(user_id), DbKeyStatus::Present)
-}
-
-pub fn purge_db() {
+pub fn purge_storage(user_id: &str) {
     // TODO : Attention, pas de gestion d'erreur ici
-    let db_path = ensure_db();
-    fs::remove_file(&db_path).expect("device.db not found.");
+    let db_path = file_path(user_id, constants::DB_EXTENSION);
+    let key_path = file_path(user_id, constants::DB_KEY_EXTENSION);
+
+    if db_path.exists() {
+        let _ = fs::remove_file(db_path);
+    }
+    if key_path.exists() {
+        let _ = fs::remove_file(key_path);
+    }
 }
 
-pub fn get_or_create_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], ClientError> {
-    let account = user_id.to_string();
-    let entry = keyring::Entry::new(constants::KEYRING_SERVICE_NAME, &account)
-        .map_err(|_| ClientError::Keyring)?;
+pub fn get_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], ClientError> {
+    // Si <user_id>.key existe, essayer de decoder+déchiffrer
+    if file_exists(user_id, constants::DB_KEY_EXTENSION) {
+        let key_path = file_path(user_id, constants::DB_KEY_EXTENSION);
+        let wrapped_b64 = fs::read_to_string(&key_path).map_err(|_| ClientError::Internal)?;
+        let wrapped_b64 = wrapped_b64.trim();
 
-    // Essayer de récupérer la db_key si existe dans la keychain
-    match entry.get_password() {
-        Ok(wrapped_b64) => {
-            let wrapped = base64::engine::general_purpose::STANDARD
-                .decode(wrapped_b64)
-                .map_err(|_| ClientError::Internal)?;
-            let db_key =
-                crypto::unwrap_db_key(export_key, &wrapped).map_err(|_| ClientError::Internal)?;
-            return Ok(db_key);
-        }
-        Err(keyring::Error::NoEntry) => {
-            // Si n'existe pas, continue en dessous pour l'ajouter dans la keychain
-        }
-        Err(_) => return Err(ClientError::Keyring),
+        let wrapped = base64::engine::general_purpose::STANDARD
+            .decode(wrapped_b64)
+            .map_err(|_| ClientError::Internal)?;
+
+        let db_key =
+            crypto::unwrap_db_key(export_key, &wrapped).map_err(|_| ClientError::Internal)?;
+
+        return Ok(db_key);
     }
 
-    // Sinon créer + wrap + store dans la keychain
+    // Sinon créer + wrap + store dans le fichier <user_id>.key
     let db_key: [u8; 32] = rand::random();
     let wrapped = crypto::wrap_db_key(export_key, &db_key).map_err(|_| ClientError::Internal)?;
     let wrapped_b64 = base64::engine::general_purpose::STANDARD.encode(wrapped);
 
-    entry
-        .set_password(&wrapped_b64)
-        .map_err(|_| ClientError::Keyring)?;
+    let key_path = file_path(user_id, constants::DB_KEY_EXTENSION);
+    if let Some(parent) = key_path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(|_| ClientError::Internal)?;
+            fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+                .map_err(|_| ClientError::Internal)?;
+        }
+    }
+    fs::write(&key_path, wrapped_b64).map_err(|_| ClientError::Internal)?;
+    fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))
+        .map_err(|_| ClientError::Internal)?;
 
     Ok(db_key)
 }
