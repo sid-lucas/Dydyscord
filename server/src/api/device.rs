@@ -1,21 +1,23 @@
 use crate::api::jwt::Claims;
 use crate::config::ServerState;
-use axum::{
-    extract::{Extension, Json, State},
-    http::StatusCode,
-};
+use crate::database::models::Device;
+use axum::{Extension, Json, extract::State, http::StatusCode};
+use uuid::Uuid;
 
 pub async fn create_device(
     State(state): State<ServerState>,
-    Json(payload): Json,
     Extension(claims_jwt): Extension<Claims>,
-) -> Result<(StatusCode, Json), StatusCode> {
-    // Stocker le opaque_record dans la BDD associé au login_lookup
-    sqlx::query!(
-        "INSERT INTO devices (user_id) VALUES ($1) RETURNING id",
-        login_lookup,
+) -> Result<(StatusCode, Json<Uuid>), StatusCode> {
+    let user_id = Uuid::parse_str(claims_jwt.sub()).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let device = sqlx::query_as!(
+        Device,
+        r#"INSERT INTO devices (user_id) VALUES ($1) RETURNING id, user_id, created_at, updated_at"#,
+        user_id
     )
-    .execute(&state.pool)
+    .fetch_one(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok((StatusCode::CREATED, Json(device.id)))
 }

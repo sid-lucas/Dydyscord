@@ -1,3 +1,4 @@
+use crate::api;
 use crate::{
     choice, error,
     mls::storage,
@@ -57,7 +58,8 @@ fn handle_logged_out() -> Result<Option<AppState>, error::ClientError> {
                     // montrer quel device du compte on utilise pour la création de groupe ou autre.
 
                     // TODO : CREER LES TYPES OPENMLS NECESSAIRES ET STOCKER DANS LA DB LOCALE
-                    println!("New device detected.")
+                    let device_id = api::new_device().map_err(|_| error::ClientError::Server)?;
+                    println!("New device detected: {device_id}");
                 } else {
                     //
                     // La c'est si le device est reconnu (a deja fait l'initialisation OpenMLS)

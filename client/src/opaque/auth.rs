@@ -167,9 +167,6 @@ pub fn login() -> Result<LoginResult, ClientError> {
     })
     .map_err(|e| e.into())?;
 
-    let string_temp = String::from("Salut");
-    api::new_device(string_temp).map_err(|e| e.into())?;
-
     Ok(LoginResult {
         id,
         export_key,

@@ -6,6 +6,7 @@ use crate::opaque::models::{
 use once_cell::sync::Lazy;
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use uuid::Uuid;
 
 const SERVER_URL: &str = "http://localhost:3000";
 
@@ -76,16 +77,12 @@ pub fn opaque_login_finish(payload: LoginFinishRequest) -> Result<String, Client
     }
 }
 
-pub fn new_device(payload: String) -> Result<String, ClientError> {
+pub fn new_device() -> Result<String, ClientError> {
     let url = format!("{SERVER_URL}/device");
-    let response = CLIENT
-        .post(&url)
-        .json(&payload)
-        .send()
-        .map_err(|_| ClientError::Network)?;
+    let response = CLIENT.post(&url).send().map_err(|_| ClientError::Network)?;
 
     match response.status() {
-        StatusCode::OK => Ok(response.text().map_err(|_| ClientError::InvalidResponse)?),
+        StatusCode::CREATED => Ok(response.text().map_err(|_| ClientError::InvalidResponse)?),
         StatusCode::BAD_REQUEST => Err(ClientError::BadRequest),
         StatusCode::UNAUTHORIZED => Err(ClientError::Unauthorized),
         _ => Err(ClientError::Server),
