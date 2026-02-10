@@ -41,7 +41,7 @@ impl openmls_sqlite_storage::Codec for CBORCodec {
 }
 
 pub fn open_sqlcipher(db_key: &[u8; 32], user_id: &str) -> Result<Connection, StorageError> {
-    let db_path = ensure_db(user_id);
+    let db_path = ensure_db(user_id, constant::DB_EXTENSION)?;
     let conn = Connection::open(db_path).map_err(|_| StorageError::DatabaseConnection)?;
 
     let key_string = base64::engine::general_purpose::STANDARD.encode(db_key);
@@ -50,49 +50,59 @@ pub fn open_sqlcipher(db_key: &[u8; 32], user_id: &str) -> Result<Connection, St
     Ok(conn)
 }
 
-pub fn ensure_db(user_id: &str) -> PathBuf {
+pub fn ensure_app_dir() -> Result<PathBuf, StorageError> {
     let home = env::var("HOME").expect("HOME not set");
 
     // Chemin jusqu'au dossier de l'app
-    let mut db = PathBuf::from(home);
-    db.push(constant::APP_FOLDER);
+    let mut path_app_dir = PathBuf::from(home);
+    let dir_name = format!(".{}", constant::APP_NAME);
+    path_app_dir.push(dir_name);
 
     // Créer le dossier de l'app si non existant
-    if !db.exists() {
-        fs::create_dir_all(&db).expect("Failed to create dir");
-        fs::set_permissions(&db, fs::Permissions::from_mode(0o700)).unwrap();
+    if !path_app_dir.exists() {
+        fs::create_dir_all(&path_app_dir).map_err(|_| StorageError::DirCreate)?;
     }
+    // S'assure d'appliquer permissions restrictives même si le dossier existe déjà
+    fs::set_permissions(&path_app_dir, fs::Permissions::from_mode(0o700))
+        .map_err(|_| StorageError::DirPermission)?;
 
-    // Chemin jusqu'au fichier db sqlite
-    let extension = constant::DB_EXTENSION;
+    // Retourne le chemin jusqu'à l'app dir
+    Ok(path_app_dir)
+}
+
+pub fn ensure_db(user_id: &str, extension: &str) -> Result<PathBuf, StorageError> {
+    let mut path_db_file = ensure_app_dir()?;
+
+    // Chemin jusqu'au fichier sqlite (.db ou .key dépendant de l'extension)
     let file_name = format!("{user_id}{extension}");
-    db.push(file_name);
+    path_db_file.push(file_name);
 
     // Créer le fichier db si non existant
-    if !db.exists() {
-        fs::File::create(&db).expect("Failed to create db file");
-        fs::set_permissions(&db, fs::Permissions::from_mode(0o600)).unwrap();
+    if !path_db_file.exists() {
+        fs::File::create(&path_db_file).map_err(|_| StorageError::FileCreate)?;
     }
+    // S'assure d'appliquer permissions restrictives même si le fichier existe déjà
+    fs::set_permissions(&path_db_file, fs::Permissions::from_mode(0o600))
+        .map_err(|_| StorageError::FilePermission)?;
 
-    db
+    Ok(path_db_file)
 }
 
 pub fn file_path(user_id: &str, extension: &str) -> PathBuf {
     let home = env::var("HOME").expect("HOME not set");
-    let path = PathBuf::from(home).join(constant::APP_FOLDER);
+    let path = PathBuf::from(home).join(format!(".{}", constant::APP_NAME));
     let file_name = format!("{user_id}{extension}");
     path.join(file_name)
 }
 
 pub fn file_exists(user_id: &str, extension: &str) -> bool {
     let home = env::var("HOME").expect("HOME not set");
-    let path_dir = PathBuf::from(home).join(constant::APP_FOLDER);
+    let path_dir = PathBuf::from(home).join(format!(".{}", constant::APP_NAME));
     let path_file = file_path(user_id, extension);
     path_dir.exists() && path_file.exists()
 }
 
 pub fn purge_storage(user_id: &str) {
-    // TODO : Attention, pas de gestion d'erreur ici
     let db_path = file_path(user_id, constant::DB_EXTENSION);
     let key_path = file_path(user_id, constant::DB_KEY_EXTENSION);
 
@@ -108,37 +118,30 @@ pub fn get_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], StorageE
     // Si <user_id>.key existe, essayer de decoder+déchiffrer
     if file_exists(user_id, constant::DB_KEY_EXTENSION) {
         let key_path = file_path(user_id, constant::DB_KEY_EXTENSION);
-        let wrapped_b64 =
-            fs::read_to_string(&key_path).map_err(|_| StorageError::KeyRead)?;
+        // TODO: Possible race condition entre le file_exists() et le read_to_string(), mais ignorée
+        let wrapped_b64 = fs::read_to_string(&key_path).map_err(|_| StorageError::KeyRead)?;
         let wrapped_b64 = wrapped_b64.trim();
 
         let wrapped = base64::engine::general_purpose::STANDARD
             .decode(wrapped_b64)
             .map_err(|_| StorageError::KeyDecode)?;
 
-        let db_key = crypto::unwrap_db_key(export_key, &wrapped)
-            .map_err(|_| StorageError::KeyUnwrap)?;
+        let db_key =
+            crypto::unwrap_db_key(export_key, &wrapped).map_err(|_| StorageError::KeyUnwrap)?;
 
         return Ok(db_key);
     }
 
-    // Sinon créer + wrap + store dans le fichier <user_id>.key
+    // Sinon créer clé + wrap
     let db_key: [u8; 32] = rand::random();
-    let wrapped =
-        crypto::wrap_db_key(export_key, &db_key).map_err(|_| StorageError::KeyWrap)?;
+    let wrapped = crypto::wrap_db_key(export_key, &db_key).map_err(|_| StorageError::KeyWrap)?;
     let wrapped_b64 = base64::engine::general_purpose::STANDARD.encode(wrapped);
 
-    let key_path = file_path(user_id, constant::DB_KEY_EXTENSION);
-    if let Some(parent) = key_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent).map_err(|_| StorageError::DatabaseRetrieval)?;
-            fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
-                .map_err(|_| StorageError::DatabaseRetrieval)?;
-        }
-    }
-    fs::write(&key_path, wrapped_b64).map_err(|_| StorageError::DatabaseRetrieval)?;
-    fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))
-        .map_err(|_| StorageError::DatabaseRetrieval)?;
+    // S'assurer de l'existence du fichier .key
+    let key_path = ensure_db(user_id, constant::DB_KEY_EXTENSION)?;
+
+    // Inscrire la db_key chiffrée dans le fichier
+    fs::write(&key_path, wrapped_b64).map_err(|_| StorageError::KeyWrite)?;
 
     Ok(db_key)
 }
