@@ -1,4 +1,2 @@
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum MlsError {}
+#[derive(Debug)]
+pub struct Mls(pub &'static str);
