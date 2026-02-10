@@ -1,2 +1,2 @@
 #[derive(Debug)]
-pub struct Mls(pub &'static str);
+pub struct MlsError(pub &'static str);

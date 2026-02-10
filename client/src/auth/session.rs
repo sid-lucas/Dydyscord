@@ -1,7 +1,6 @@
 use crate::auth::opaque::LoginResult;
 use crate::error::AppError;
 use crate::mls::provider::{self, MyProvider};
-use crate::storage::error::StorageError;
 use uuid::Uuid;
 
 pub enum AppState {

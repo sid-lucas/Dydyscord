@@ -8,10 +8,16 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum AppError {
     Auth(AuthError),
+    Mls(MlsError),
     Storage(StorageError),
     Transport(TransportError),
     Ui(UiError),
-    Mls(MlsError),
+}
+
+impl From<AuthError> for AppError {
+    fn from(err: AuthError) -> Self {
+        AppError::Auth(err)
+    }
 }
 
 impl From<MlsError> for AppError {
@@ -38,20 +44,14 @@ impl From<UiError> for AppError {
     }
 }
 
-impl From<AuthError> for AppError {
-    fn from(err: AuthError) -> Self {
-        AppError::Auth(err)
-    }
-}
-
 impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AppError::Auth(e) => write!(f, "Auth error: {}", e.0),
-            AppError::Storage(e) => write!(f, "Storage error: {}", e),
+            AppError::Mls(e) => write!(f, "MLS error: {}", e.0),
+            AppError::Storage(e) => write!(f, "Storage error: {}", e.0),
             AppError::Transport(e) => write!(f, "Transport error: {}", e),
             AppError::Ui(e) => write!(f, "UI error: {}", e),
-            AppError::Mls(e) => write!(f, "MLS error: {}", e),
         }
     }
 }

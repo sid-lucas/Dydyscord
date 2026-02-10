@@ -5,6 +5,7 @@ use openmls_traits::OpenMlsProvider;
 use crate::{
     error::AppError,
     storage::database::{self, CBORCodec},
+    storage::error::StorageError,
 };
 
 pub struct MyProvider {
@@ -34,9 +35,9 @@ pub fn prepare_provider(db_key: &[u8; 32], user_id: &str) -> Result<MyProvider, 
 
     let mut storage = SqliteStorageProvider::<CBORCodec, _>::new(conn);
 
-    storage
-        .run_migrations()
-        .map_err(|_| Mls("Error running migrations"))?;
+    // No error handling :
+    storage.run_migrations();
+
     Ok(MyProvider {
         crypto: RustCrypto::default(),
         rand: RustCrypto::default(),
