@@ -115,11 +115,6 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
         finish_register_request,
     })?;
 
-    // TODO : utiliser
-    // CA c'est la master_key (dérivée du mdp) qui servira a dériver plein de sous-clés de chiffrement
-    // Uniquement connue du client.
-    let _export_key = finish.export_key;
-
     Ok(())
 }
 
@@ -134,9 +129,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     let start_login_request =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
-    // Délai aléatoire pour éviter les attaques timing // TODO A CHANGER
-    let random_delay = Duration::from_millis(300 + (rand::random::<u64>() % 200));
-    thread::sleep(random_delay);
+    // TODO : fix timing attack
 
     // Call API (envoi requête et réception réponse)
     let response = http::opaque_login(LoginStartRequest {

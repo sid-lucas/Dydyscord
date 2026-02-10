@@ -8,27 +8,20 @@ use hkdf::Hkdf;
 use sha2::Sha256;
 
 pub fn wrap_db_key(export_key: &[u8], db_key: &[u8; 32]) -> Result<Vec<u8>, AppError> {
-    let wrap_key = derive_wrap_key(export_key)?;
+    let mut wrap_key = [0u8; 32];
+    wrap_key.copy_from_slice(&export_key[..32]);
     encrypt_with_key(&wrap_key, db_key)
 }
 
 pub fn unwrap_db_key(export_key: &[u8], wrapped: &[u8]) -> Result<[u8; 32], AppError> {
-    let wrap_key = derive_wrap_key(export_key)?;
+    let mut wrap_key = [0u8; 32];
+    wrap_key.copy_from_slice(&export_key[..32]);
     let plain = decrypt_with_key(&wrap_key, wrapped)?;
     if plain.len() != 32 {
         return Err(StorageError::UnwrapDbKey.into());
     }
     let mut out = [0u8; 32];
     out.copy_from_slice(&plain);
-    Ok(out)
-}
-
-fn derive_wrap_key(export_key: &[u8]) -> Result<[u8; 32], AppError> {
-    // TODO : Vérifier... dériver wrap_key avec export_key pcq export_key fait 64bytes et il faut une clé de 32bytes pour chiffrer db_key
-    let hk = Hkdf::<Sha256>::new(None, export_key);
-    let mut out = [0u8; 32];
-    hk.expand(b"db-key-wrap", &mut out)
-        .map_err(|_| StorageError::DeriveWrapKey)?;
     Ok(out)
 }
 
