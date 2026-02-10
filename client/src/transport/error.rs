@@ -1,15 +1,9 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum ClientError {
-    #[error("could not read input")]
-    Input,
-
+pub enum TransportError {
     #[error("could not reach server")]
     Network,
-
-    #[error("username already exists")]
-    UsernameTaken,
 
     #[error("server error")]
     Server,
@@ -20,15 +14,15 @@ pub enum ClientError {
     #[error("bad request sent to server")]
     BadRequest,
 
-    #[error("username or password is incorrect")]
-    LoginFailed,
-
     #[error("unauthorized access")]
     Unauthorized,
 
     #[error("internal error")]
     Internal,
 
-    #[error("keyring error")]
-    Keyring,
+    #[error("username already exists")]
+    UsernameTaken,
+
+    #[error("username or password is incorrect")]
+    LoginFailed,
 }

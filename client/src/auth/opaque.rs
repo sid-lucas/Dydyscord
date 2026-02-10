@@ -1,13 +1,7 @@
-use crate::api;
-use crate::error::ClientError;
-use crate::mls::storage;
-use crate::opaque::models::{
-    LoginFinishRequest, LoginStartRequest, RegisterFinishRequest, RegisterStartRequest,
-};
-use crate::session;
 use DefaultCipherSuite as DCS;
 use base64::Engine;
-use inquire::{Password, Text};
+
+use crate::transport::{error::TransportError, http};
 use opaque_ke::argon2::Argon2;
 use opaque_ke::{
     CipherSuite, ClientLogin, ClientLoginFinishParameters, ClientRegistration,
@@ -16,6 +10,47 @@ use opaque_ke::{
 use rand::rngs::OsRng;
 use std::{thread, time::Duration};
 use uuid::Uuid;
+
+use serde::{Deserialize, Serialize};
+
+// Register
+
+#[derive(Serialize)]
+pub struct RegisterStartRequest<'a> {
+    pub username: &'a str,
+    pub start_register_request: String, // base64
+}
+
+#[derive(Deserialize)]
+pub struct RegisterStartResponse {
+    pub start_register_response: String, // base64
+}
+
+#[derive(Serialize)]
+pub struct RegisterFinishRequest<'a> {
+    pub username: &'a str,
+    pub finish_register_request: String, // base64
+}
+
+// Login
+
+#[derive(Serialize)]
+pub struct LoginStartRequest<'a> {
+    pub username: &'a str,
+    pub start_login_request: String, // base64
+}
+
+#[derive(Deserialize)]
+pub struct LoginStartResponse {
+    pub start_login_response: String, // base64
+    pub user_id: Uuid, // aussi utilisé comme clé-valeur pour retrouver le server_login_state
+}
+
+#[derive(Serialize)]
+pub struct LoginFinishRequest {
+    pub finish_login_request: String, // base64
+    pub user_id: Uuid,                // clé-valeur pour retrouver le server_login_state
+}
 
 struct DefaultCipherSuite;
 
@@ -31,20 +66,11 @@ pub struct LoginResult {
     pub session_key: Vec<u8>,
 }
 
-pub fn register() -> Result<(), ClientError> {
-    let username = Text::new("Enter your username:")
-        .prompt()
-        .map_err(|_| ClientError::Input)?;
-
-    let password = Password::new("Enter your password:")
-        .prompt()
-        .map_err(|_| ClientError::Input)?
-        .into_bytes();
-
+pub fn register(username: &str, password: &str) -> Result<(), TransportError> {
     let mut client_rng = OsRng;
 
     // Démarrer le register client avec OPAQUE
-    let start = ClientRegistration::<DCS>::start(&mut client_rng, &password)
+    let start = ClientRegistration::<DCS>::start(&mut client_rng, &password.as_bytes())
         .expect("Failed to start client registration");
 
     // Préparation de la request à envoyer au serveur
@@ -52,7 +78,7 @@ pub fn register() -> Result<(), ClientError> {
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
     // Call API (envoi requête et réception réponse)
-    let response = api::opaque_register(RegisterStartRequest {
+    let response = http::opaque_register(RegisterStartRequest {
         username: &username,
         start_register_request,
     });
@@ -74,7 +100,7 @@ pub fn register() -> Result<(), ClientError> {
         .state
         .finish(
             &mut client_rng,
-            &password,
+            &password.as_bytes(),
             register_response,
             ClientRegistrationFinishParameters::default(),
         )
@@ -85,7 +111,7 @@ pub fn register() -> Result<(), ClientError> {
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
     // Call API (envoi requête et réception réponse)
-    api::opaque_register_finish(RegisterFinishRequest {
+    http::opaque_register_finish(RegisterFinishRequest {
         username: &username,
         finish_register_request,
     })
@@ -99,21 +125,11 @@ pub fn register() -> Result<(), ClientError> {
     Ok(())
 }
 
-pub fn login() -> Result<LoginResult, ClientError> {
-    let username = Text::new("Enter your username:")
-        .prompt()
-        .map_err(|_| ClientError::Input)?;
-
-    let password = Password::new("Enter your password:")
-        .without_confirmation()
-        .prompt()
-        .map_err(|_| ClientError::Input)?
-        .into_bytes();
-
+pub fn login(username: &str, password: &str) -> Result<LoginResult, TransportError> {
     let mut client_rng = OsRng;
 
     // Démarrer le login client avec OPAQUE
-    let start = ClientLogin::<DCS>::start(&mut client_rng, &password)
+    let start = ClientLogin::<DCS>::start(&mut client_rng, &password.as_bytes())
         .expect("Failed to start client login");
 
     // Préparation de la request à envoyer au serveur
@@ -125,7 +141,7 @@ pub fn login() -> Result<LoginResult, ClientError> {
     thread::sleep(random_delay);
 
     // Call API (envoi requête et réception réponse)
-    let response = api::opaque_login(LoginStartRequest {
+    let response = http::opaque_login(LoginStartRequest {
         username: &username,
         start_login_request,
     });
@@ -147,11 +163,11 @@ pub fn login() -> Result<LoginResult, ClientError> {
         .state
         .finish(
             &mut client_rng,
-            &password,
+            &password.as_bytes(),
             login_response,
             ClientLoginFinishParameters::default(),
         )
-        .map_err(|_| ClientError::LoginFailed)?;
+        .map_err(|_| TransportError::LoginFailed)?;
 
     let export_key = finish.export_key.to_vec();
     let session_key = finish.session_key.to_vec();
@@ -161,7 +177,7 @@ pub fn login() -> Result<LoginResult, ClientError> {
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
     // Call API (envoi requête et réception réponse)
-    api::opaque_login_finish(LoginFinishRequest {
+    http::opaque_login_finish(LoginFinishRequest {
         finish_login_request,
         user_id: id,
     })
