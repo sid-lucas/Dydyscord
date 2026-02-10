@@ -1,7 +1,6 @@
 use DefaultCipherSuite as DCS;
 use base64::Engine;
 use opaque_ke::CipherSuite;
-use opaque_ke::ServerSetup;
 use opaque_ke::argon2::Argon2;
 use rand::rngs::OsRng;
 
@@ -20,7 +19,6 @@ use opaque_ke::{
     CredentialFinalization, CredentialRequest, RegistrationRequest, RegistrationUpload,
     ServerLogin, ServerLoginParameters, ServerRegistration,
 };
-use rand::RngCore;
 use redis::AsyncCommands;
 use secrecy::ExposeSecret;
 
@@ -297,8 +295,12 @@ pub async fn login_finish(
 
     // Création du JWT intermédiaire (auth)
     let id = payload.user_id.to_string();
-    let token = jwt::create_jwt(id.as_str(), jwt::TokenType::Auth)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let token = jwt::create_jwt(
+        id.as_str(),
+        jwt::TokenType::Auth,
+        &state.jwt_key.expose_secret(),
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let cookie = Cookie::build((constant::AUTH_HEADER, token))
         .http_only(false) // TODO change

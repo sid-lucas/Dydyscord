@@ -17,6 +17,7 @@ pub struct ServerState {
     pub redis: ConnectionManager,
     pub opaque_setup: Arc<ServerSetup<OpaqueCiphersuite>>,
     pub pepper: Arc<SecretSlice<u8>>,
+    pub jwt_key: Arc<SecretSlice<u8>>,
 }
 
 pub async fn init_server_state() -> ServerState {
@@ -26,15 +27,18 @@ pub async fn init_server_state() -> ServerState {
 
     let redis = setup_redis().await;
 
+    let opaque_setup = setup_opaque();
+
     let pepper = setup_pepper();
 
-    let opaque_setup = setup_opaque();
+    let jwt_key = setup_jwt_key();
 
     ServerState {
         pool,
         redis,
         opaque_setup,
         pepper,
+        jwt_key,
     }
 }
 
@@ -61,10 +65,25 @@ async fn setup_redis() -> ConnectionManager {
         .expect("cannot connect to redis")
 }
 
+fn setup_opaque() -> Arc<ServerSetup<OpaqueCiphersuite>> {
+    let server_setup_b64 =
+        std::env::var("OPAQUE_SERVER_SETUP").expect("OPAQUE_SERVER_SETUP must be set");
+
+    let server_setup_bytes = base64::engine::general_purpose::STANDARD
+        .decode(server_setup_b64)
+        .expect("OPAQUE_SERVER_SETUP invalid base64");
+
+    let server_setup = ServerSetup::<OpaqueCiphersuite>::deserialize(&server_setup_bytes)
+        .expect("Failed to deserialize OPAQUE_SERVER_SETUP");
+
+    Arc::new(server_setup)
+}
+
 fn setup_pepper() -> Arc<SecretSlice<u8>> {
     let pepper_hex = std::env::var("SERVER_PEPPER").expect("SERVER_PEPPER must be set");
 
     let pepper_bytes = hex::decode(pepper_hex).expect("SERVER_PEPPER invalid hex");
+
     if pepper_bytes.len() != 64 {
         panic!("SERVER_PEPPER must be 64 bytes");
     }
@@ -72,13 +91,15 @@ fn setup_pepper() -> Arc<SecretSlice<u8>> {
     Arc::new(pepper_bytes.into())
 }
 
-fn setup_opaque() -> Arc<ServerSetup<OpaqueCiphersuite>> {
-    let server_setup_b64 =
-        std::env::var("OPAQUE_SERVER_SETUP").expect("OPAQUE_SERVER_SETUP must be set");
-    let server_setup_bytes = base64::engine::general_purpose::STANDARD
-        .decode(server_setup_b64)
-        .expect("OPAQUE_SERVER_SETUP invalid base64");
-    let server_setup = ServerSetup::<OpaqueCiphersuite>::deserialize(&server_setup_bytes)
-        .expect("Failed to deserialize OPAQUE_SERVER_SETUP");
-    Arc::new(server_setup)
+fn setup_jwt_key() -> Arc<SecretSlice<u8>> {
+    let jwt_key = std::env::var("JWT_SECRET_KEY").expect("JWT_SECRET_KEY must be set");
+
+    let jwt_key_bytes = hex::decode(jwt_key).expect("SERVER_PEPPER invalid hex");
+
+    match jwt_key_bytes.len() {
+        32 | 48 | 64 => {}
+        _ => panic!("JWT_SECRET_KEY must be 32, 48, or 64 bytes"),
+    }
+
+    Arc::new(jwt_key_bytes.into())
 }

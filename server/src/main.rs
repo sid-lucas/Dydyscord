@@ -3,9 +3,8 @@ use axum::{
     Router, middleware,
     routing::{get, post},
 };
-use config::{constant, server::ServerState};
-use dotenv::dotenv;
-use handler::{auth, root};
+use config::constant;
+use handler::auth;
 
 mod config;
 mod database;
@@ -16,20 +15,20 @@ async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
-    dotenv().ok();
-    let secret = std::env::var("JWT_SECRET_KEY").expect("JWT_SECRET_KEY must be set");
-    constant::JWT_SECRET_KEY
-        .set(secret)
-        .expect("JWT_SECRET_KEY already set");
-
     let server_state = server::init_server_state().await;
 
     let app = Router::new()
-        // Routes protégées par authentification (nécessite login):
+        // Routes protégées par un JWT Access:
+        // None
+        // Routes protégées par un JWT Refresh:
+        // None
+        // Routes protégées par un JWT Auth:
         .route(
             "/device",
-            post(handler::auth::device::create_device)
-                .layer(middleware::from_fn(handler::auth::jwt::verify_jwt_auth)),
+            post(handler::auth::device::create_device).layer(middleware::from_fn_with_state(
+                server_state.clone(),
+                handler::auth::jwt::verify_jwt_auth,
+            )),
         )
         // Routes ouvertes :
         .route("/", get(handler::root::root))
@@ -48,6 +47,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(constant::SERVER_ADDR)
         .await
         .unwrap();
+
     println!("🚀 Listening on {}", constant::SERVER_ADDR);
     let _ = axum::serve(listener, app).await;
 }

@@ -1,7 +1,9 @@
 use crate::config::constant;
-use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
+use crate::config::server::ServerState;
+use axum::{extract::Request, extract::State, http::StatusCode, middleware::Next, response::Response};
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -64,7 +66,11 @@ impl Claims {
     }
 }
 
-pub fn create_jwt(sub: &str, typ: TokenType) -> Result<String, jsonwebtoken::errors::Error> {
+pub fn create_jwt(
+    sub: &str,
+    typ: TokenType,
+    key: &[u8],
+) -> Result<String, jsonwebtoken::errors::Error> {
     // Header du token
     let mut header = Header::new(Algorithm::HS256);
     header.typ = Some("JWT".to_string());
@@ -73,17 +79,14 @@ pub fn create_jwt(sub: &str, typ: TokenType) -> Result<String, jsonwebtoken::err
     let claims = Claims::new(sub, typ);
 
     // Envoie retour du token (header + payload + signature)
-    jsonwebtoken::encode::<Claims>(
-        &header,
-        &claims,
-        &EncodingKey::from_secret(constant::JWT_SECRET_KEY.get().unwrap().as_ref()),
-    )
+    jsonwebtoken::encode::<Claims>(&header, &claims, &EncodingKey::from_secret(key))
 }
 
 pub async fn verify_jwt_with_type(
     mut req: Request,
     next: Next,
     typ: TokenType,
+    key: &[u8],
 ) -> Result<Response, StatusCode> {
     // Récupère le cookie
     let cookie = req
@@ -104,11 +107,8 @@ pub async fn verify_jwt_with_type(
     validation.set_audience(&[constant::JWT_AUDIENCE]);
 
     // Decode token + signature OK + checks de claims (selon Validation)
-    let decoded = jsonwebtoken::decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(constant::JWT_SECRET_KEY.get().unwrap().as_ref()),
-        &validation,
-    );
+    let decoded =
+        jsonwebtoken::decode::<Claims>(token, &DecodingKey::from_secret(key), &validation);
 
     match decoded {
         Ok(data) => {
@@ -126,10 +126,18 @@ pub async fn verify_jwt_with_type(
     }
 }
 
-pub async fn verify_jwt_access(req: Request, next: Next) -> Result<Response, StatusCode> {
-    verify_jwt_with_type(req, next, TokenType::Access).await
+pub async fn verify_jwt_access(
+    State(state): State<ServerState>,
+    req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    verify_jwt_with_type(req, next, TokenType::Access, state.jwt_key.expose_secret()).await
 }
 
-pub async fn verify_jwt_auth(req: Request, next: Next) -> Result<Response, StatusCode> {
-    verify_jwt_with_type(req, next, TokenType::Auth).await
+pub async fn verify_jwt_auth(
+    State(state): State<ServerState>,
+    req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    verify_jwt_with_type(req, next, TokenType::Auth, state.jwt_key.expose_secret()).await
 }
