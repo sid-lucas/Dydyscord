@@ -37,4 +37,7 @@ pub enum StorageError {
 
     #[error("could not serialize/deserialize")]
     CodecSerde,
+
+    #[error("sqlite migration failed")]
+    Migration,
 }

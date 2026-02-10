@@ -5,6 +5,7 @@ use std::{env, fs, path::PathBuf};
 
 use crate::config::constant;
 use crate::storage::{crypto, error::StorageError};
+use crate::transport::http;
 
 pub struct CBORCodec;
 
@@ -150,4 +151,28 @@ pub fn reconcile_device_storage(user_id: &str) -> bool {
     println!("has_db : {}", has_db);
 
     has_db && has_key
+}
+
+pub fn get_provider_info(
+    user_id: &str,
+    export_key: &[u8],
+) -> Result<([u8; 32], String), StorageError> {
+    // Reconcile + récupère si le device est reconnu avant potentielle init de la db
+    let new_device = !reconcile_device_storage(&user_id.to_string());
+
+    // Récupèration/Création de la clé de chiffrement de la db
+    let db_key = get_db_key(&user_id.to_string(), &export_key)?;
+
+    if new_device {
+        // TODO : CREER LES TYPES OPENMLS NECESSAIRES ET STOCKER DANS LA DB LOCALE
+        let device_id = http::create_device().map_err(|_| StorageError::CodecSerde)?;
+        Ok((db_key, device_id))
+    } else {
+        //
+        // La c'est si le device est reconnu (a deja fait l'initialisation OpenMLS)
+
+        // TODO : LIRE LES TYPES DE LA DB LOCALE
+
+        Ok((db_key, "device_id_placeholder".to_string()))
+    }
 }

@@ -1,8 +1,10 @@
 mod auth;
 mod config;
+mod mls;
 mod storage;
 mod transport;
 mod ui;
+
 use auth::session::AppState;
 use auth::session::Session;
 use storage::database;
@@ -78,44 +80,20 @@ fn login() -> Option<AppState> {
         }
     };
 
-    match auth::opaque::login(&username, &password) {
-        Ok(login_result) => {
-            // Ajout des informations de login OPAQUE dans la session
-            let mut session = Session::new(login_result);
-
-            // Reconcile + récupère si le device est reconnu avant potentielle init de la db
-            let new_device = !database::reconcile_device_storage(&session.user_id.to_string());
-
-            // Récupèration/Création de la clé de chiffrement de la db
-            let db_key =
-                database::get_db_key(&session.user_id.to_string(), &session.export_key).unwrap();
-
-            // Ouverture de la connexion de la db et préparation du provider OpenMLS
-            session.set_provider(&db_key, &session.user_id.to_string())?;
-
-            if new_device {
-                // TODO : CREER LES TYPES OPENMLS NECESSAIRES ET STOCKER DANS LA DB LOCALE
-                let device_id = http::new_device()
-                    .map_err(|e| {
-                        eprintln!("Failed to create new device: {e}");
-                    })
-                    .ok()?;
-
-                println!("New device detected: {device_id}");
-            } else {
-                //
-                // La c'est si le device est reconnu (a deja fait l'initialisation OpenMLS)
-
-                // TODO : LIRE LES TYPES DE LA DB LOCALE
-                println!("Retrieved device information.")
-            }
-
-            println!("Login successful!");
-            Some(AppState::LoggedIn(session))
-        }
+    // Ajout des informations de login OPAQUE dans la session
+    let mut session = match auth::opaque::login(&username, &password) {
+        Ok(login_result) => Session::new(login_result),
         Err(e) => {
             eprintln!("Login failed: {e}");
-            Some(AppState::LoggedOut)
+            return Some(AppState::LoggedOut);
         }
-    }
+    };
+
+    
+
+    // Ouverture de la connexion de la db et préparation du provider OpenMLS
+    session.set_provider(&db_key, &session.user_id.to_string());
+
+    println!("Login successful!");
+    Some(AppState::LoggedIn(session))
 }

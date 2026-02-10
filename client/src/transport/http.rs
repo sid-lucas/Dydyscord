@@ -82,7 +82,7 @@ pub fn opaque_login_finish(payload: LoginFinishRequest) -> Result<String, Transp
     }
 }
 
-pub fn new_device() -> Result<String, TransportError> {
+pub fn create_device() -> Result<String, TransportError> {
     let url = format!("{SERVER_URL}/device");
     let response = CLIENT
         .post(&url)

@@ -1,5 +1,6 @@
-use crate::auth::mls::{self, MyProvider};
 use crate::auth::opaque::LoginResult;
+use crate::mls::provider::{self, MyProvider};
+use crate::storage::error::StorageError;
 use uuid::Uuid;
 
 pub enum AppState {
@@ -28,8 +29,8 @@ impl Session {
         }
     }
 
-    pub fn set_provider(&mut self, db_key: &[u8; 32], user_id: &str) -> Result<(), ClientError> {
-        self.provider = Some(mls::prepare_provider(db_key, user_id)?);
+    pub fn set_provider(&mut self, db_key: &[u8; 32], user_id: &str) -> Result<(), StorageError> {
+        self.provider = Some(provider::prepare_provider(db_key, user_id)?);
         Ok(())
     }
 }
