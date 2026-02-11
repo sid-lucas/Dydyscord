@@ -198,38 +198,47 @@ pub fn reconcile_device_storage(user_id: &str) -> bool {
     has_db && has_key
 }
 
-pub fn init_device_storage(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], AppError> {
+pub fn init_device_storage(
+    user_id: &str,
+    export_key: &[u8],
+) -> Result<(String, [u8; 32], bool), AppError> {
     // Vérifie la présence des fichiers db/key et purge si problème
     let has_storage = !reconcile_device_storage(&user_id.to_string());
 
     // Récupèration/Création de la clé de chiffrement de la db
     let db_key = get_db_key(&user_id.to_string(), &export_key)?;
 
-    // TODO : IL FAUT CHECK QUE PAS SEULEMENT DEVICE_ID EST PRESENT
-    // MAIS TT LES TYPE IMPORTANT DE OPENMLS AUSSI (CLE PRIVEE, ETC.)
-    // INSTAURER UN HMAC OU QUOI ? CAR ON VA PAS CHECKER TOUS LES CHAMPS DE DB POUR VOIR SI CEST OK NON?
-
     // Si fichiers OK, tente de lire et récup le device_id stocké
     let device_id = if has_storage {
         match read_device_id(&db_key, user_id) {
-            Ok(id) => Some(id),
+            Ok(id) => id,
             Err(_) => None, // Aucun device_id n'a pu être récup -> considéré corrompue
         }
     } else {
         None
     };
 
-    if device_id.is_none() {
-        // Nouveau device détecté, initialisation avec serveur
+    let mut is_new_device = false;
 
-        // Récupération du nouveau device_id et du JWT Refresh
-        let device_id = http::create_device()?;
+    let device_id = match device_id {
+        Some(id) => {
+            // Device connu, requête au serveur pour obtenir JWT Refresh au nom du device_id
+            // TODO http::upgrade_jwt() pour obtenir JWT Refresh
+            id
+        }
+        None => {
+            // Nouveau device détecté, initialisation avec serveur
+            is_new_device = true;
 
-        // Stockage du device_id dans db locale
-        store_device_id(&db_key, user_id, device_id.as_str())?;
-    } else {
-        // Device connu, requête au serveur pour obtenir JWT Refresh au nom du device_id
-    }
+            // Récupération du nouveau device_id et du JWT Refresh
+            let device_id = http::create_device()?;
 
-    Ok(db_key)
+            // Stockage du device_id dans db locale
+            store_device_id(&db_key, user_id, device_id.as_str())?;
+
+            device_id
+        }
+    };
+
+    Ok((device_id, db_key, is_new_device))
 }
