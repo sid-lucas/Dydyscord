@@ -24,6 +24,7 @@ async fn main() {
         // Routes protégées par un JWT Refresh:
         // None
         // Routes protégées par un JWT Auth:
+        // TODO Add route qui améliore notre JWT Auth en JWT Refresh
         .route(
             "/device",
             post(handler::auth::device::create_device).layer(middleware::from_fn_with_state(

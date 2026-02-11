@@ -55,5 +55,8 @@ fn generate_key_package(
 
 pub fn init_openmls(is_new_device: bool) -> Result<(), AppError> {
     // si nouveau device : créer les elements openmls nécessaire et les mettre dans la db
+
+    // TODO
+
     Ok(())
 }

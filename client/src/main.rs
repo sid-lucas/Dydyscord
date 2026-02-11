@@ -111,7 +111,7 @@ fn login() -> Option<AppState> {
     }
 
     // Initialisation de OpenMLS
-    mls::identity::init_openmls(is_new_device);
+    let _ = mls::identity::init_openmls(is_new_device);
 
     println!("Login successful!");
     Some(AppState::LoggedIn(session))
