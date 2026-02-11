@@ -15,7 +15,7 @@ pub fn generate_wrapped_db_key(
     let db_key: SecretSlice<u8> = rand::random::<[u8; 32]>().to_vec().into();
 
     // Récupère les 32 premiers bytes de l'export_key pour wrap la db_key
-    let bytes = export_key.expose_secret()
+    let bytes = export_key.expose_secret();
     if bytes.len() < 32 {
         return Err(StorageError::ExportKeyLength.into());
     }
@@ -32,7 +32,7 @@ pub fn unwrap_db_key(
     wrapped: &[u8],
 ) -> Result<SecretSlice<u8>, AppError> {
     // Récupère les 32 premiers bytes de l'export_key pour unwrap la db_key
-    let bytes = export_key.expose_secret()
+    let bytes = export_key.expose_secret();
     if bytes.len() < 32 {
         return Err(StorageError::ExportKeyLength.into());
     }

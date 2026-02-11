@@ -1,3 +1,4 @@
+use crate::auth::error::AuthError;
 use crate::auth::opaque::LoginResult;
 use crate::error::AppError;
 use crate::mls::provider::{self, MyProvider};
@@ -29,6 +30,23 @@ impl Session {
         }
     }
 
+    // Setter
+    pub fn set_device_id(&mut self, id: String) {
+        self.device_id = Some(id);
+    }
+
+    pub fn set_db_key(&mut self, db_key: SecretSlice<u8>) {
+        self.db_key = Some(db_key);
+    }
+
+    pub fn set_provider(&mut self) -> Result<(), AppError> {
+        let Some(db_key) = self.db_key.as_ref() else {
+            return Err(AuthError::SessionDbKeyUnset.into());
+        };
+        self.provider = Some(provider::prepare_provider(db_key, self.user_id())?);
+        Ok(())
+    }
+
     // Getter
     pub fn user_id(&self) -> &str {
         self.user_id.as_str()
@@ -52,10 +70,5 @@ impl Session {
 
     pub fn provider(&self) -> Option<&MyProvider> {
         self.provider.as_ref()
-    }
-
-    pub fn set_provider(&mut self, db_key: &[u8; 32], user_id: &str) -> Result<(), AppError> {
-        self.provider = Some(provider::prepare_provider(db_key, user_id)?);
-        Ok(())
     }
 }

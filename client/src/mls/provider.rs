@@ -1,6 +1,7 @@
 use openmls_rust_crypto::RustCrypto;
 use openmls_sqlite_storage::{Connection, SqliteStorageProvider};
 use openmls_traits::OpenMlsProvider;
+use secrecy::SecretSlice;
 
 use crate::{
     error::AppError,
@@ -30,7 +31,7 @@ impl OpenMlsProvider for MyProvider {
     }
 }
 
-pub fn prepare_provider(db_key: &[u8; 32], user_id: &str) -> Result<MyProvider, AppError> {
+pub fn prepare_provider(db_key: &SecretSlice<u8>, user_id: &str) -> Result<MyProvider, AppError> {
     let conn = database::open_sqlcipher(db_key, user_id)?;
 
     let mut storage = SqliteStorageProvider::<CBORCodec, _>::new(conn);

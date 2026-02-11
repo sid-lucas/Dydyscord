@@ -92,7 +92,7 @@ fn login() -> Option<AppState> {
 
     // Initialisation des fichiers de storage local et récupèration du JWT Refresh
     let (device_id, db_key, is_new_device) =
-        match database::init_device_storage(&session.user_id.to_string(), &session.export_key) {
+        match database::init_device_storage(session.user_id(), session.export_key()) {
             Ok(result) => result,
             Err(e) => {
                 eprintln!("Device storage initialization failed: {e}");
@@ -101,10 +101,11 @@ fn login() -> Option<AppState> {
         };
 
     // Ajout des informations de init device/storage dans la session
-    // TODO
+    session.set_device_id(device_id);
+    session.set_db_key(db_key);
 
     // Ouverture de la connexion de la db et préparation du provider OpenMLS
-    if let Err(e) = session.set_provider(&db_key, &session.user_id.to_string()) {
+    if let Err(e) = session.set_provider() {
         eprintln!("Login failed: {e}");
         return Some(AppState::LoggedOut);
     }

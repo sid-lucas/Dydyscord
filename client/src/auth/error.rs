@@ -19,4 +19,7 @@ pub enum AuthError {
 
     #[error("could not deserialize opaque response")]
     OpaqueDeserialize,
+
+    #[error("tried to use an unset session db_key")]
+    SessionDbKeyUnset,
 }
