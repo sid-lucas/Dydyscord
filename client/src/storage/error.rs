@@ -2,60 +2,68 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum StorageError {
-    #[error("could not unwrap db key")]
-    UnwrapDbKey,
-
-    #[error("could not derive wrap key")]
-    DeriveWrapKey,
-
+    // Crypto
     #[error("could not encrypt with wrap key")]
     EncryptWithWrapKey,
 
     #[error("could not decrypt with wrap key")]
     DecryptWithWrapKey,
 
-    #[error("invalid envelope length")]
-    InvalidEnvelopeLength,
+    #[error("invalid db_key length (has to be 32 bytes)")]
+    DbKeyLength,
+
+    #[error("invalid export_key length (has to be 32+ bytes)")]
+    ExportKeyLength,
+
+    #[error("invalid envelope length (has to be 13+ bytes)")]
+    EnvelopeLength,
 
     #[error("invalid envelope version")]
-    InvalidEnvelopeVersion,
+    EnvelopeVersion,
 
+    // Codec / serialization
     #[error("could not serialize CBOR codec")]
-    SerializeCborCodec,
+    CborCodecSerialize,
 
     #[error("could not deserialize CBOR codec")]
-    DeserializeCborCodec,
+    CborCodecDeserialize,
 
+    // Database / SQLite
     #[error("could not connect to database")]
-    ConnectDatabase,
+    DatabaseConnect,
 
     #[error("could not read database")]
-    ReadDatabase,
+    DatabaseRead,
 
+    #[error("could not create schema")]
+    DatabaseSchema,
+
+    #[error("could not perfom query on database")]
+    DatabaseQuery,
+
+    // Fichiers / permissions
     #[error("could not create app directory")]
-    CreateAppDirectory,
+    AppDirectoryCreate,
 
     #[error("could not set app directory permissions")]
-    SetAppDirectoryPermissions,
+    AppDirectoryPermissions,
 
     #[error("could not create storage file")]
-    CreateStorageFile,
+    StorageFileCreate,
 
     #[error("could not set storage file permissions")]
-    SetStorageFilePermissions,
+    StorageFilePermissions,
 
     #[error("could not read db key from file")]
-    ReadDbKeyFile,
+    StorageFileRead,
 
     #[error("could not decode db key")]
-    DecodeDbKey,
-
-    #[error("could not wrap db key")]
-    WrapDbKey,
+    DbKeyDecode,
 
     #[error("could not store db key")]
-    StoreDbKey,
+    DbKeyStore,
 
+    // App state
     #[error("device_id was not found in database")]
-    DeviceIdMissing,
+    DeviceIdMissing, // TODO unused
 }

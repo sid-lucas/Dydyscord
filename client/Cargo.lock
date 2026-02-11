@@ -282,11 +282,11 @@ dependencies = [
  "rand 0.8.5",
  "reqwest",
  "rusqlite",
+ "secrecy",
  "serde",
  "sha2",
  "thiserror 2.0.18",
  "uuid",
- "zeroize",
 ]
 
 [[package]]
@@ -2558,6 +2558,15 @@ dependencies = [
  "pkcs8",
  "serdect",
  "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
  "zeroize",
 ]
 

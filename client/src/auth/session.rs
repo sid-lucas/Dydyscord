@@ -1,8 +1,7 @@
 use crate::auth::opaque::LoginResult;
 use crate::error::AppError;
 use crate::mls::provider::{self, MyProvider};
-use uuid::Uuid;
-use zeroize::Zeroize;
+use secrecy::SecretSlice;
 
 pub enum AppState {
     LoggedOut,
@@ -10,46 +9,53 @@ pub enum AppState {
 }
 
 pub struct Session {
-    pub user_id: Uuid,
-    pub device_id: Option<String>,
-    pub export_key: Vec<u8>,
-    pub session_key: Vec<u8>,
-    pub db_key: Option<Vec<u8>>,
-    pub provider: Option<MyProvider>,
+    user_id: String,
+    device_id: Option<String>,
+    export_key: SecretSlice<u8>,
+    session_key: SecretSlice<u8>,
+    db_key: Option<SecretSlice<u8>>,
+    provider: Option<MyProvider>,
 }
 
 impl Session {
     pub fn new(login: LoginResult) -> Self {
         Session {
-            user_id: login.id,
-            export_key: login.export_key,
-            session_key: login.session_key,
+            user_id: login.id.to_string(),
             device_id: None,
+            export_key: login.export_key.into(),
+            session_key: login.session_key.into(),
             db_key: None,
             provider: None,
         }
     }
 
-    // Clear propre des secrets en mémoire
-    pub fn clear(&mut self) {
-        self.export_key.zeroize();
-        self.export_key.clear();
-        self.session_key.zeroize();
-        self.session_key.clear();
-        if let Some(mut key) = self.db_key.take() {
-            key.zeroize();
-            key.clear();
-        }
+    // Getter
+    pub fn user_id(&self) -> &str {
+        self.user_id.as_str()
+    }
+
+    pub fn device_id(&self) -> Option<&str> {
+        self.device_id.as_deref()
+    }
+
+    pub fn export_key(&self) -> &SecretSlice<u8> {
+        &self.export_key
+    }
+
+    pub fn session_key(&self) -> &SecretSlice<u8> {
+        &self.session_key
+    }
+
+    pub fn db_key(&self) -> Option<&SecretSlice<u8>> {
+        self.db_key.as_ref()
+    }
+
+    pub fn provider(&self) -> Option<&MyProvider> {
+        self.provider.as_ref()
     }
 
     pub fn set_provider(&mut self, db_key: &[u8; 32], user_id: &str) -> Result<(), AppError> {
         self.provider = Some(provider::prepare_provider(db_key, user_id)?);
         Ok(())
-    }
-}
-
-impl Drop for Session {
-    fn drop(&mut self) {
-        self.clear();
     }
 }

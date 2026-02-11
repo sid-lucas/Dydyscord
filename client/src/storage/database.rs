@@ -1,6 +1,7 @@
 use base64::Engine;
 use openmls_sqlite_storage::Connection;
 use rusqlite::{OptionalExtension, params};
+use secrecy::{ExposeSecret, SecretSlice};
 use std::os::unix::fs::PermissionsExt;
 use std::{env, fs, path::PathBuf};
 
@@ -23,25 +24,25 @@ impl openmls_sqlite_storage::Codec for CBORCodec {
     fn to_vec<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, Self::Error> {
         let mut out = Vec::new();
         ciborium::ser::into_writer(value, &mut out)
-            .map_err(|_| StorageError::SerializeCborCodec)?;
+            .map_err(|_| StorageError::CborCodecSerialize)?;
         Ok(out)
     }
 
     fn from_slice<T: serde::de::DeserializeOwned>(slice: &[u8]) -> Result<T, Self::Error> {
         let input =
-            ciborium::de::from_reader(slice).map_err(|_| StorageError::DeserializeCborCodec)?;
+            ciborium::de::from_reader(slice).map_err(|_| StorageError::CborCodecDeserialize)?;
         Ok(input)
     }
 }
 
-pub fn open_sqlcipher(db_key: &[u8; 32], user_id: &str) -> Result<Connection, StorageError> {
+pub fn open_sqlcipher(db_key: &SecretSlice<u8>, user_id: &str) -> Result<Connection, StorageError> {
     let db_path = ensure_db(user_id, constant::DB_EXTENSION)?;
-    let conn = Connection::open(db_path).map_err(|_| StorageError::ConnectDatabase)?;
+    let conn = Connection::open(db_path).map_err(|_| StorageError::DatabaseConnect)?;
 
-    let key_string = base64::engine::general_purpose::STANDARD.encode(db_key);
+    let key_string = base64::engine::general_purpose::STANDARD.encode(db_key.expose_secret());
 
     conn.pragma_update(None, "key", &key_string)
-        .map_err(|_| StorageError::ReadDatabase)?;
+        .map_err(|_| StorageError::DatabaseRead)?;
 
     Ok(conn)
 }
@@ -56,11 +57,11 @@ pub fn ensure_app_dir() -> Result<PathBuf, StorageError> {
 
     // Créer le dossier de l'app si non existant
     if !path_app_dir.exists() {
-        fs::create_dir_all(&path_app_dir).map_err(|_| StorageError::CreateAppDirectory)?;
+        fs::create_dir_all(&path_app_dir).map_err(|_| StorageError::AppDirectoryCreate)?;
     }
     // S'assure d'appliquer permissions restrictives même si le dossier existe déjà
     fs::set_permissions(&path_app_dir, fs::Permissions::from_mode(0o700))
-        .map_err(|_| StorageError::SetAppDirectoryPermissions)?;
+        .map_err(|_| StorageError::AppDirectoryPermissions)?;
 
     // Retourne le chemin jusqu'à l'app dir
     Ok(path_app_dir)
@@ -75,11 +76,11 @@ pub fn ensure_db(user_id: &str, extension: &str) -> Result<PathBuf, StorageError
 
     // Créer le fichier db si non existant
     if !path_db_file.exists() {
-        fs::File::create(&path_db_file).map_err(|_| StorageError::CreateStorageFile)?;
+        fs::File::create(&path_db_file).map_err(|_| StorageError::StorageFileCreate)?;
     }
     // S'assure d'appliquer permissions restrictives même si le fichier existe déjà
     fs::set_permissions(&path_db_file, fs::Permissions::from_mode(0o600))
-        .map_err(|_| StorageError::SetStorageFilePermissions)?;
+        .map_err(|_| StorageError::StorageFilePermissions)?;
     Ok(path_db_file)
 }
 
@@ -109,34 +110,36 @@ pub fn purge_storage(user_id: &str) {
     }
 }
 
-pub fn get_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], StorageError> {
+pub fn get_db_key(
+    user_id: &str,
+    export_key: &SecretSlice<u8>,
+) -> Result<SecretSlice<u8>, AppError> {
     // Si <user_id>.key existe, essayer de decoder+déchiffrer
     if file_exists(user_id, constant::DB_KEY_EXTENSION) {
         let key_path = file_path(user_id, constant::DB_KEY_EXTENSION);
         // TODO: Possible race condition entre le file_exists() et le read_to_string(), mais ignorée
-        let wrapped_b64 = fs::read_to_string(&key_path).map_err(|_| StorageError::ReadDbKeyFile)?;
+        let wrapped_b64 =
+            fs::read_to_string(&key_path).map_err(|_| StorageError::StorageFileRead)?;
         let wrapped_b64 = wrapped_b64.trim();
 
         let wrapped = base64::engine::general_purpose::STANDARD
             .decode(wrapped_b64)
-            .map_err(|_| StorageError::DecodeDbKey)?;
+            .map_err(|_| StorageError::DbKeyDecode)?;
 
-        let db_key =
-            crypto::unwrap_db_key(export_key, &wrapped).map_err(|_| StorageError::UnwrapDbKey)?;
+        let db_key = crypto::unwrap_db_key(export_key, &wrapped)?;
 
         return Ok(db_key);
     }
 
-    // Sinon créer clé + wrap
-    let db_key: [u8; 32] = rand::random();
-    let wrapped = crypto::wrap_db_key(export_key, &db_key).map_err(|_| StorageError::WrapDbKey)?;
+    // Sinon générer la db_key et la wrap
+    let (db_key, wrapped) = crypto::generate_wrapped_db_key(export_key)?;
     let wrapped_b64 = base64::engine::general_purpose::STANDARD.encode(wrapped);
 
     // S'assurer de l'existence du fichier .key
     let key_path = ensure_db(user_id, constant::DB_KEY_EXTENSION)?;
 
     // Inscrire la db_key chiffrée dans le fichier
-    fs::write(&key_path, wrapped_b64).map_err(|_| StorageError::StoreDbKey)?;
+    fs::write(&key_path, wrapped_b64).map_err(|_| StorageError::DbKeyStore)?;
 
     Ok(db_key)
 }
@@ -149,11 +152,15 @@ fn ensure_app_state_table(conn: &Connection) -> Result<(), AppError> {
         )",
         [],
     )
-    .map_err(|_| StorageError::ReadDatabase)?;
+    .map_err(|_| StorageError::DatabaseSchema)?;
     Ok(())
 }
 
-pub fn store_device_id(db_key: &[u8; 32], user_id: &str, device_id: &str) -> Result<(), AppError> {
+pub fn store_device_id(
+    db_key: &SecretSlice<u8>,
+    user_id: &str,
+    device_id: &str,
+) -> Result<(), AppError> {
     let conn = open_sqlcipher(db_key, user_id)?;
 
     ensure_app_state_table(&conn)?;
@@ -162,12 +169,12 @@ pub fn store_device_id(db_key: &[u8; 32], user_id: &str, device_id: &str) -> Res
         "INSERT OR REPLACE INTO app_state (key, value) VALUES ('device_id', ?1)",
         params![device_id],
     )
-    .map_err(|_| StorageError::ReadDatabase)?;
+    .map_err(|_| StorageError::DatabaseQuery)?;
 
     Ok(())
 }
 
-pub fn read_device_id(db_key: &[u8; 32], user_id: &str) -> Result<Option<String>, AppError> {
+pub fn read_device_id(db_key: &SecretSlice<u8>, user_id: &str) -> Result<Option<String>, AppError> {
     let conn = open_sqlcipher(db_key, user_id)?;
 
     ensure_app_state_table(&conn)?;
@@ -179,7 +186,7 @@ pub fn read_device_id(db_key: &[u8; 32], user_id: &str) -> Result<Option<String>
             |row| row.get(0),
         )
         .optional()
-        .map_err(|_| StorageError::ReadDatabase)?;
+        .map_err(|_| StorageError::DatabaseQuery)?;
 
     Ok(device_id)
 }
@@ -200,13 +207,13 @@ pub fn reconcile_device_storage(user_id: &str) -> bool {
 
 pub fn init_device_storage(
     user_id: &str,
-    export_key: &[u8],
-) -> Result<(String, [u8; 32], bool), AppError> {
+    export_key: &SecretSlice<u8>,
+) -> Result<(String, SecretSlice<u8>, bool), AppError> {
     // Vérifie la présence des fichiers db/key et purge si problème
-    let has_storage = !reconcile_device_storage(&user_id.to_string());
+    let has_storage = reconcile_device_storage(&user_id.to_string());
 
     // Récupèration/Création de la clé de chiffrement de la db
-    let db_key = get_db_key(&user_id.to_string(), &export_key)?;
+    let db_key = get_db_key(&user_id.to_string(), export_key)?;
 
     // Si fichiers OK, tente de lire et récup le device_id stocké
     let device_id = if has_storage {
