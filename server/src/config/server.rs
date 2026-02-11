@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use secrecy::SecretSlice;
 
+use crate::config::constant;
 use crate::handler::auth::opaque::DefaultCipherSuite as OpaqueCiphersuite;
 
 #[derive(Clone)]
@@ -62,10 +63,10 @@ impl ServerState {
         let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
         PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(constant::PG_MAX_CONNECTION)
             .connect(&database_url)
             .await
-            .expect("Failed to connect to database")
+            .expect("Failed to connect to postgres database")
     }
 
     async fn init_redis() -> ConnectionManager {
@@ -76,7 +77,7 @@ impl ServerState {
         client
             .get_connection_manager()
             .await
-            .expect("cannot connect to redis")
+            .expect("Failed to connect to redis database")
     }
 
     fn init_opaque() -> Arc<ServerSetup<OpaqueCiphersuite>> {

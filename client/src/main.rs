@@ -8,7 +8,6 @@ mod ui;
 
 use auth::session::AppState;
 use auth::session::Session;
-use std::process::exit;
 use storage::database;
 use ui::choice;
 
@@ -73,6 +72,7 @@ fn signup() -> Option<AppState> {
 }
 
 fn login() -> Option<AppState> {
+    // Handshake OPAQUE avec le serveur et récupèration du JWT Auth
     let (username, password) = match ui::prompt::login() {
         Ok((username, password)) => (username, password),
         Err(e) => {
@@ -90,19 +90,21 @@ fn login() -> Option<AppState> {
         }
     };
 
-    let (db_key, device_id) = match database::initialize_device_storage(
-        &session.user_id.to_string(),
-        &session.export_key,
-    ) {
-        Ok(result) => result,
-        Err(e) => {
-            eprintln!("Device storage initialization failed: {e}");
-            return Some(AppState::LoggedOut);
-        }
-    };
+    // Initialisation des fichiers de storage local et récupèration du JWT Refresh
+    let db_key =
+        match database::init_device_storage(&session.user_id.to_string(), &session.export_key) {
+            Ok(result) => result,
+            Err(e) => {
+                eprintln!("Device storage initialization failed: {e}");
+                return Some(AppState::LoggedOut);
+            }
+        };
 
     // Ouverture de la connexion de la db et préparation du provider OpenMLS
-    let _ = session.set_provider(&db_key, &session.user_id.to_string());
+    if let Err(e) = session.set_provider(&db_key, &session.user_id.to_string()) {
+        eprintln!("Login failed: {e}");
+        return Some(AppState::LoggedOut);
+    }
 
     println!("Login successful!");
     Some(AppState::LoggedIn(session))

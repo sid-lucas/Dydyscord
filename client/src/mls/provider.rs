@@ -4,6 +4,7 @@ use openmls_traits::OpenMlsProvider;
 
 use crate::{
     error::AppError,
+    mls::error::MlsError,
     storage::database::{self, CBORCodec},
 };
 
@@ -32,7 +33,9 @@ impl OpenMlsProvider for MyProvider {
 pub fn prepare_provider(db_key: &[u8; 32], user_id: &str) -> Result<MyProvider, AppError> {
     let conn = database::open_sqlcipher(db_key, user_id)?;
 
-    let storage = SqliteStorageProvider::<CBORCodec, _>::new(conn);
+    let mut storage = SqliteStorageProvider::<CBORCodec, _>::new(conn);
+
+    storage.run_migrations().map_err(|_| MlsError::Migration)?;
 
     Ok(MyProvider {
         crypto: RustCrypto::default(),

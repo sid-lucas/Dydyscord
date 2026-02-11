@@ -307,7 +307,7 @@ pub async fn login_finish(
         .secure(false) // TODO Change: true interdit l'envoi un HTTP. -> false pour test local pour l'instant.
         .same_site(SameSite::Strict)
         .path("/")
-        .build(); // si erreur: remplace .build() par .finish()
+        .build();
 
     let jar = CookieJar::new().add(cookie);
 

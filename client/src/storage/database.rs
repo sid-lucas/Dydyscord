@@ -1,5 +1,6 @@
 use base64::Engine;
 use openmls_sqlite_storage::Connection;
+use rusqlite::{OptionalExtension, params};
 use std::os::unix::fs::PermissionsExt;
 use std::{env, fs, path::PathBuf};
 
@@ -38,8 +39,10 @@ pub fn open_sqlcipher(db_key: &[u8; 32], user_id: &str) -> Result<Connection, St
     let conn = Connection::open(db_path).map_err(|_| StorageError::ConnectDatabase)?;
 
     let key_string = base64::engine::general_purpose::STANDARD.encode(db_key);
+
     conn.pragma_update(None, "key", &key_string)
         .map_err(|_| StorageError::ReadDatabase)?;
+
     Ok(conn)
 }
 
@@ -138,6 +141,49 @@ pub fn get_db_key(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], StorageE
     Ok(db_key)
 }
 
+fn ensure_app_state_table(conn: &Connection) -> Result<(), AppError> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_state (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )",
+        [],
+    )
+    .map_err(|_| StorageError::ReadDatabase)?;
+    Ok(())
+}
+
+pub fn store_device_id(db_key: &[u8; 32], user_id: &str, device_id: &str) -> Result<(), AppError> {
+    let conn = open_sqlcipher(db_key, user_id)?;
+
+    ensure_app_state_table(&conn)?;
+
+    conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('device_id', ?1)",
+        params![device_id],
+    )
+    .map_err(|_| StorageError::ReadDatabase)?;
+
+    Ok(())
+}
+
+pub fn read_device_id(db_key: &[u8; 32], user_id: &str) -> Result<Option<String>, AppError> {
+    let conn = open_sqlcipher(db_key, user_id)?;
+
+    ensure_app_state_table(&conn)?;
+
+    let device_id: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_state WHERE key = 'device_id' LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| StorageError::ReadDatabase)?;
+
+    Ok(device_id)
+}
+
 // Check si existe deja une db + db_key (device existe)
 // ou si l'un manque (device non existant et purge si incohérence)
 pub fn reconcile_device_storage(user_id: &str) -> bool {
@@ -152,26 +198,38 @@ pub fn reconcile_device_storage(user_id: &str) -> bool {
     has_db && has_key
 }
 
-pub fn initialize_device_storage(
-    user_id: &str,
-    export_key: &[u8],
-) -> Result<([u8; 32], String), AppError> {
-    // Reconcile + récupère si le device est reconnu avant potentielle init de la db
-    let new_device = !reconcile_device_storage(&user_id.to_string());
+pub fn init_device_storage(user_id: &str, export_key: &[u8]) -> Result<[u8; 32], AppError> {
+    // Vérifie la présence des fichiers db/key et purge si problème
+    let has_storage = !reconcile_device_storage(&user_id.to_string());
 
     // Récupèration/Création de la clé de chiffrement de la db
     let db_key = get_db_key(&user_id.to_string(), &export_key)?;
 
-    if new_device {
-        // TODO : CREER LES TYPES OPENMLS NECESSAIRES ET STOCKER DANS LA DB LOCALE
-        let device_id = http::create_device()?;
-        Ok((db_key, device_id))
+    // TODO : IL FAUT CHECK QUE PAS SEULEMENT DEVICE_ID EST PRESENT
+    // MAIS TT LES TYPE IMPORTANT DE OPENMLS AUSSI (CLE PRIVEE, ETC.)
+    // INSTAURER UN HMAC OU QUOI ? CAR ON VA PAS CHECKER TOUS LES CHAMPS DE DB POUR VOIR SI CEST OK NON?
+
+    // Si fichiers OK, tente de lire et récup le device_id stocké
+    let device_id = if has_storage {
+        match read_device_id(&db_key, user_id) {
+            Ok(id) => Some(id),
+            Err(_) => None, // Aucun device_id n'a pu être récup -> considéré corrompue
+        }
     } else {
-        //
-        // La c'est si le device est reconnu (a deja fait l'initialisation OpenMLS)
+        None
+    };
 
-        // TODO : LIRE LES TYPES DE LA DB LOCALE
+    if device_id.is_none() {
+        // Nouveau device détecté, initialisation avec serveur
 
-        Ok((db_key, "device_id_placeholder".to_string()))
+        // Récupération du nouveau device_id et du JWT Refresh
+        let device_id = http::create_device()?;
+
+        // Stockage du device_id dans db locale
+        store_device_id(&db_key, user_id, device_id.as_str())?;
+    } else {
+        // Device connu, requête au serveur pour obtenir JWT Refresh au nom du device_id
     }
+
+    Ok(db_key)
 }
