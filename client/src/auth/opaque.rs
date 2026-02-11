@@ -1,4 +1,4 @@
-use DefaultCipherSuite as DCS;
+use OpaqueCipherSuite as Default;
 use base64::Engine;
 
 use crate::error::AppError;
@@ -54,9 +54,9 @@ pub struct LoginFinishRequest {
     pub user_id: Uuid,                // clé-valeur pour retrouver le server_login_state
 }
 
-struct DefaultCipherSuite;
+struct OpaqueCipherSuite;
 
-impl CipherSuite for DefaultCipherSuite {
+impl CipherSuite for OpaqueCipherSuite {
     type OprfCs = opaque_ke::Ristretto255;
     type KeyExchange = opaque_ke::TripleDh<opaque_ke::Ristretto255, sha2::Sha512>;
     type Ksf = Argon2<'static>;
@@ -64,7 +64,7 @@ impl CipherSuite for DefaultCipherSuite {
 
 pub struct LoginResult {
     pub id: Uuid,
-    pub export_key: Vec<u8>,
+    pub export_key: Vec<u8>, // TODO REVOIR avec SecretSlice<u8>
     pub session_key: Vec<u8>,
 }
 
@@ -72,7 +72,7 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
     let mut client_rng = OsRng;
 
     // Démarrer le register client avec OPAQUE
-    let start = ClientRegistration::<DCS>::start(&mut client_rng, &password.as_bytes())
+    let start = ClientRegistration::<Default>::start(&mut client_rng, &password.as_bytes())
         .map_err(|_| AuthError::OpaqueRegisterStart)?;
 
     // Préparation de la request à envoyer au serveur
@@ -91,7 +91,7 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
         .decode(&register_response_b64)
         .map_err(|_| AuthError::OpaqueDecode)?;
     // Response désérialisation
-    let register_response = RegistrationResponse::<DCS>::deserialize(&register_response_bytes)
+    let register_response = RegistrationResponse::<Default>::deserialize(&register_response_bytes)
         .map_err(|_| AuthError::OpaqueDeserialize)?;
 
     // Démarrer le finish avec la réponse du serveur
@@ -122,7 +122,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     let mut client_rng = OsRng;
 
     // Démarrer le login client avec OPAQUE
-    let start = ClientLogin::<DCS>::start(&mut client_rng, &password.as_bytes())
+    let start = ClientLogin::<Default>::start(&mut client_rng, &password.as_bytes())
         .map_err(|_| AuthError::OpaqueLoginStart)?;
 
     // Préparation de la request à envoyer au serveur
@@ -143,7 +143,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
         .decode(&login_response_b64)
         .map_err(|_| AuthError::OpaqueDecode)?;
     // Response désérialisation
-    let login_response = CredentialResponse::<DCS>::deserialize(&login_response_bytes)
+    let login_response = CredentialResponse::<Default>::deserialize(&login_response_bytes)
         .map_err(|_| AuthError::OpaqueDeserialize)?;
 
     // Finaliser le login avec la réponse du serveur

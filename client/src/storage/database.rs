@@ -10,6 +10,8 @@ use crate::error::AppError;
 use crate::storage::{crypto, error::StorageError};
 use crate::transport::http;
 
+// TODO Peut etre découper en plusieurs fichiers, à discuter
+
 pub struct CBORCodec;
 
 impl Default for CBORCodec {
