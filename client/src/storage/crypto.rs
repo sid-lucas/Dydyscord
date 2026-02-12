@@ -9,8 +9,6 @@ use secrecy::{ExposeSecret, SecretSlice};
 pub fn generate_wrapped_db_key(
     export_key: &SecretSlice<u8>,
 ) -> Result<(SecretSlice<u8>, Vec<u8>), AppError> {
-    use secrecy::ExposeSecret;
-
     // Génère une nouvelle db_key (32 bytes)
     let db_key: SecretSlice<u8> = rand::random::<[u8; 32]>().to_vec().into();
 
@@ -59,10 +57,10 @@ pub fn encrypt_db_key(
 
     // Chiffrement la db_key avec la wrap_key
     let cipher = Aes256Gcm::new_from_slice(wrap_key.expose_secret())
-        .map_err(|_| StorageError::EncryptWithWrapKey)?;
+        .map_err(|_| StorageError::Encrypt)?;
     let ciphertext = cipher
         .encrypt(&nonce, db_key.expose_secret())
-        .map_err(|_| StorageError::EncryptWithWrapKey)?;
+        .map_err(|_| StorageError::Encrypt)?;
 
     // Création wrap (envelope): version || nonce || ciphertext (tag inclus dans ct)
     let mut wrapped = Vec::with_capacity(1 + 12 + ciphertext.len());
@@ -94,10 +92,10 @@ pub fn decrypt_db_key(
 
     // Déchiffrement de la db_key avec la wrap_key
     let cipher = Aes256Gcm::new_from_slice(wrap_key.expose_secret())
-        .map_err(|_| StorageError::DecryptWithWrapKey)?;
+        .map_err(|_| StorageError::Decrypt)?;
     let db_key_vec = cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|_| StorageError::DecryptWithWrapKey)?;
+        .map_err(|_| StorageError::Decrypt)?;
 
     // Conversion en SecretSlice
     let db_key: SecretSlice<u8> = db_key_vec.into();

@@ -4,10 +4,10 @@ use thiserror::Error;
 pub enum StorageError {
     // Crypto
     #[error("could not encrypt with wrap key")]
-    EncryptWithWrapKey,
+    Encrypt,
 
     #[error("could not decrypt with wrap key")]
-    DecryptWithWrapKey,
+    Decrypt,
 
     #[error("invalid db_key length (has to be 32 bytes)")]
     DbKeyLength,

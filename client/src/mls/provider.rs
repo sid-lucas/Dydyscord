@@ -6,7 +6,7 @@ use secrecy::SecretSlice;
 use crate::{
     error::AppError,
     mls::error::MlsError,
-    storage::database::{self, CBORCodec},
+    storage::{codec::CBORCodec, database}
 };
 
 pub struct MyProvider {
