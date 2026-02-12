@@ -18,7 +18,7 @@ pub enum TokenType {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    sub: String,    // Optional. Subject, whom token refers to (user_id or device_id?)
+    sub: String,    // Optional. Subject, whom token refers to (user_id or device_id)
     typ: TokenType, // Custom field created by me, type : Auth, Refresh, Access
     //prm: String, // Custom field created by me, Permissions/prm (role)
     aud: String, // Optional. Audience (ex: payments-service)
