@@ -45,13 +45,13 @@ pub struct LoginStartRequest<'a> {
 #[derive(Deserialize)]
 pub struct LoginStartResponse {
     pub start_login_response: String, // base64
-    pub user_id: Uuid, // aussi utilisé comme clé-valeur pour retrouver le server_login_state
+    pub user_id: Uuid, // also used as key-value to retrieve server_login_state
 }
 
 #[derive(Serialize)]
 pub struct LoginFinishRequest {
     pub finish_login_request: String, // base64
-    pub user_id: Uuid,                // clé-valeur pour retrouver le server_login_state
+    pub user_id: Uuid,                // key-value to retrieve server_login_state
 }
 
 struct OpaqueCipherSuite;
@@ -64,22 +64,22 @@ impl CipherSuite for OpaqueCipherSuite {
 
 pub struct LoginResult {
     pub id: Uuid,
-    pub export_key: Vec<u8>, // TODO REVOIR avec SecretSlice<u8>
+    pub export_key: Vec<u8>, // TODO REVIEW with SecretSlice<u8>
     pub session_key: Vec<u8>,
 }
 
 pub fn register(username: &str, password: &str) -> Result<(), AppError> {
     let mut client_rng = OsRng;
 
-    // Démarrer le register client avec OPAQUE
+    // Start client registration with OPAQUE
     let start = ClientRegistration::<Default>::start(&mut client_rng, &password.as_bytes())
         .map_err(|_| AuthError::OpaqueRegisterStart)?;
 
-    // Préparation de la request à envoyer au serveur
+    // Prepare the request to send to the server
     let start_register_request =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
-    // Call API (envoi requête et réception réponse)
+    // API call (send request and receive response)
     let response = http::opaque_register(RegisterStartRequest {
         username: &username,
         start_register_request,
@@ -90,11 +90,11 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
     let register_response_bytes = base64::engine::general_purpose::STANDARD
         .decode(&register_response_b64)
         .map_err(|_| AuthError::OpaqueDecode)?;
-    // Response désérialisation
+    // Response deserialization
     let register_response = RegistrationResponse::<Default>::deserialize(&register_response_bytes)
         .map_err(|_| AuthError::OpaqueDeserialize)?;
 
-    // Démarrer le finish avec la réponse du serveur
+    // Start finish with the server response
     let finish = start
         .state
         .finish(
@@ -105,11 +105,11 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
         )
         .map_err(|_| AuthError::OpaqueRegisterFinish)?;
 
-    // Préparation de la request à envoyer au serveur
+    // Prepare the request to send to the server
     let finish_register_request =
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
-    // Call API (envoi requête et réception réponse)
+    // API call (send request and receive response)
     http::opaque_register_finish(RegisterFinishRequest {
         username: &username,
         finish_register_request,
@@ -121,17 +121,17 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
 pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     let mut client_rng = OsRng;
 
-    // Démarrer le login client avec OPAQUE
+    // Start client login with OPAQUE
     let start = ClientLogin::<Default>::start(&mut client_rng, &password.as_bytes())
         .map_err(|_| AuthError::OpaqueLoginStart)?;
 
-    // Préparation de la request à envoyer au serveur
+    // Prepare the request to send to the server
     let start_login_request =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
     // TODO : fix timing attack
 
-    // Call API (envoi requête et réception réponse)
+    // API call (send request and receive response)
     let response = http::opaque_login(LoginStartRequest {
         username: &username,
         start_login_request,
@@ -142,11 +142,11 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     let login_response_bytes = base64::engine::general_purpose::STANDARD
         .decode(&login_response_b64)
         .map_err(|_| AuthError::OpaqueDecode)?;
-    // Response désérialisation
+    // Response deserialization
     let login_response = CredentialResponse::<Default>::deserialize(&login_response_bytes)
         .map_err(|_| AuthError::OpaqueDeserialize)?;
 
-    // Finaliser le login avec la réponse du serveur
+    // Finish login with the server response
     let finish = start
         .state
         .finish(
@@ -160,11 +160,11 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     let export_key = finish.export_key.to_vec();
     let session_key = finish.session_key.to_vec();
 
-    // Préparation de la request à envoyer au serveur+
+    // Prepare the request to send to the server+
     let finish_login_request =
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
-    // Call API (envoi requête et réception réponse)
+    // API call (send request and receive response)
     http::opaque_login_finish(LoginFinishRequest {
         finish_login_request,
         user_id: id,

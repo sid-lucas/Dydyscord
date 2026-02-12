@@ -19,12 +19,12 @@ async fn main() {
     let server_state = server::ServerState::new().await;
 
     let app = Router::new()
-        // Routes protégées par un JWT Access:
+        // Routes protected by an Access JWT:
         // None
-        // Routes protégées par un JWT Refresh:
+        // Routes protected by a Refresh JWT:
         // None
-        // Routes protégées par un JWT Auth:
-        // TODO Add route qui améliore notre JWT Auth en JWT Refresh
+        // Routes protected by an Auth JWT:
+        // TODO Add route that upgrades our Auth JWT to Refresh JWT
         .route(
             "/device",
             post(handler::auth::device::create_device).layer(middleware::from_fn_with_state(
@@ -32,7 +32,7 @@ async fn main() {
                 handler::auth::jwt::verify_jwt_auth,
             )),
         )
-        // Routes ouvertes :
+        // Open routes:
         .route("/", get(handler::root::root))
         .route(
             "/register/start",

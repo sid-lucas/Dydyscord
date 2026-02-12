@@ -10,7 +10,7 @@ use crate::error::AppError;
 use crate::storage::{crypto, error::StorageError};
 use crate::transport::http;
 
-// TODO Peut etre découper en plusieurs fichiers, à discuter
+// TODO Maybe split into multiple files, to discuss
 
 pub fn open_sqlcipher(db_key: &SecretSlice<u8>, user_id: &str) -> Result<Connection, StorageError> {
     let db_path = ensure_db(user_id, constant::DB_EXTENSION)?;
@@ -27,35 +27,35 @@ pub fn open_sqlcipher(db_key: &SecretSlice<u8>, user_id: &str) -> Result<Connect
 pub fn ensure_app_dir() -> Result<PathBuf, StorageError> {
     let home = env::var("HOME").expect("HOME not set"); // TODO : CONST
 
-    // Chemin jusqu'au dossier de l'app
+    // Path to the app folder
     let mut path_app_dir = PathBuf::from(home);
     let dir_name = format!(".{}", constant::APP_NAME);
     path_app_dir.push(dir_name);
 
-    // Créer le dossier de l'app si non existant
+    // Create the app folder if it does not exist
     if !path_app_dir.exists() {
         fs::create_dir_all(&path_app_dir).map_err(|_| StorageError::AppDirectoryCreate)?;
     }
-    // S'assure d'appliquer permissions restrictives même si le dossier existe déjà
+    // Ensure restrictive permissions are applied even if the folder already exists
     fs::set_permissions(&path_app_dir, fs::Permissions::from_mode(0o700))
         .map_err(|_| StorageError::AppDirectoryPermissions)?;
 
-    // Retourne le chemin jusqu'à l'app dir
+    // Return the path to the app dir
     Ok(path_app_dir)
 }
 
 pub fn ensure_db(user_id: &str, extension: &str) -> Result<PathBuf, StorageError> {
     let mut path_db_file = ensure_app_dir()?;
 
-    // Chemin jusqu'au fichier sqlite (.db ou .key dépendant de l'extension)
+    // Path to the sqlite file (.db or .key depending on extension)
     let file_name = format!("{user_id}{extension}");
     path_db_file.push(file_name);
 
-    // Créer le fichier db si non existant
+    // Create the db file if it does not exist
     if !path_db_file.exists() {
         fs::File::create(&path_db_file).map_err(|_| StorageError::StorageFileCreate)?;
     }
-    // S'assure d'appliquer permissions restrictives même si le fichier existe déjà
+    // Ensure restrictive permissions are applied even if the file already exists
     fs::set_permissions(&path_db_file, fs::Permissions::from_mode(0o600))
         .map_err(|_| StorageError::StorageFilePermissions)?;
     Ok(path_db_file)
@@ -91,10 +91,10 @@ pub fn get_db_key(
     user_id: &str,
     export_key: &SecretSlice<u8>,
 ) -> Result<SecretSlice<u8>, AppError> {
-    // Si <user_id>.key existe, essayer de decoder+déchiffrer
+    // If <user_id>.key exists, try to decode+decrypt
     if file_exists(user_id, constant::DB_KEY_EXTENSION) {
         let key_path = file_path(user_id, constant::DB_KEY_EXTENSION);
-        // TODO: Possible race condition entre le file_exists() et le read_to_string(), mais ignorée
+        // TODO: Possible race condition between file_exists() and read_to_string(), but ignored
         let wrapped_b64 =
             fs::read_to_string(&key_path).map_err(|_| StorageError::StorageFileRead)?;
         let wrapped_b64 = wrapped_b64.trim();
@@ -108,14 +108,14 @@ pub fn get_db_key(
         return Ok(db_key);
     }
 
-    // Sinon générer la db_key et la wrap
+    // Otherwise generate db_key and wrap it
     let (db_key, wrapped) = crypto::generate_wrapped_db_key(export_key)?;
     let wrapped_b64 = base64::engine::general_purpose::STANDARD.encode(wrapped);
 
-    // S'assurer de l'existence du fichier .key
+    // Ensure the .key file exists
     let key_path = ensure_db(user_id, constant::DB_KEY_EXTENSION)?;
 
-    // Inscrire la db_key chiffrée dans le fichier
+    // Write the encrypted db_key into the file
     fs::write(&key_path, wrapped_b64).map_err(|_| StorageError::DbKeyStore)?;
 
     Ok(db_key)
@@ -168,13 +168,13 @@ pub fn read_device_id(db_key: &SecretSlice<u8>, user_id: &str) -> Result<Option<
     Ok(device_id)
 }
 
-// Check si existe deja une db + db_key (device existe)
-// ou si l'un manque (device non existant et purge si incohérence)
+// Check whether a db + db_key already exist (device exists)
+// or whether one is missing (device does not exist and purge on inconsistency)
 pub fn reconcile_device_storage(user_id: &str) -> bool {
     let has_db = file_exists(user_id, constant::DB_EXTENSION);
     let has_key = file_exists(user_id, constant::DB_KEY_EXTENSION);
 
-    // Si db présente mais pas la db_key -> considère la db comme corrompue/perdue donc purge
+    // If db is present but not db_key -> consider db corrupted/lost, so purge
     if !has_db || !has_key {
         purge_storage(user_id);
     }
@@ -186,17 +186,17 @@ pub fn init_device_storage(
     user_id: &str,
     export_key: &SecretSlice<u8>,
 ) -> Result<(String, SecretSlice<u8>, bool), AppError> {
-    // Vérifie la présence des fichiers db/key et purge si problème
+    // Check for db/key files and purge if there is an issue
     let has_storage = reconcile_device_storage(&user_id.to_string());
 
-    // Récupèration/Création de la clé de chiffrement de la db
+    // Retrieve/Create the db encryption key
     let db_key = get_db_key(&user_id.to_string(), export_key)?;
 
-    // Si fichiers OK, tente de lire et récup le device_id stocké
+    // If files are OK, try to read and retrieve the stored device_id
     let device_id = if has_storage {
         match read_device_id(&db_key, user_id) {
             Ok(id) => id,
-            Err(_) => None, // Aucun device_id n'a pu être récup -> considéré corrompue
+            Err(_) => None, // No device_id could be retrieved -> considered corrupted
         }
     } else {
         None
@@ -206,18 +206,18 @@ pub fn init_device_storage(
 
     let device_id = match device_id {
         Some(id) => {
-            // Device connu, requête au serveur pour obtenir JWT Refresh au nom du device_id
-            // TODO http::upgrade_jwt() pour obtenir JWT Refresh
+            // Known device, request server to get JWT Refresh on behalf of device_id
+            // TODO http::upgrade_jwt() to get JWT Refresh
             id
         }
         None => {
-            // Nouveau device détecté, initialisation avec serveur
+            // New device detected, initialize with server
             is_new_device = true;
 
-            // Récupération du nouveau device_id et du JWT Refresh
+            // Retrieve the new device_id and JWT Refresh
             let device_id = http::create_device()?;
 
-            // Stockage du device_id dans db locale
+            // Store device_id in local db
             store_device_id(&db_key, user_id, device_id.as_str())?;
 
             device_id

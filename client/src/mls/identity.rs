@@ -12,15 +12,15 @@ fn generate_credential_with_key(
     signature_algorithm: SignatureScheme,
     provider: &impl OpenMlsProvider,
 ) -> Result<(CredentialWithKey, SignatureKeyPair), AppError> {
-    // Création du credential avec l'identité (device_id)
+    // Create the credential with the identity (device_id)
     let identity = identity.as_bytes().to_vec();
     let credential = BasicCredential::new(identity);
 
-    // Création de la paire de clés de signature associée
+    // Create the associated signature key pair
     let signature_keys =
         SignatureKeyPair::new(signature_algorithm).map_err(|_| MlsError::SignatureKeysCreate)?;
 
-    // Stock la paire dans la db associé au compte, so OpenMLS has access to it
+    // Store the pair in the account-associated db, so OpenMLS has access to it
     signature_keys
         .store(provider.storage())
         .map_err(|_| MlsError::SignatureKeysStore)?;
@@ -40,7 +40,7 @@ fn generate_key_package(
     signer: &SignatureKeyPair,
     credential_with_key: CredentialWithKey,
 ) -> Result<KeyPackageBundle, AppError> {
-    // Création du key package
+    // Create the key package
     let key_package = KeyPackage::builder()
         .build(
             constant::OPENMLS_CIPHERSUITE,
@@ -54,7 +54,7 @@ fn generate_key_package(
 }
 
 pub fn init_openmls(is_new_device: bool) -> Result<(), AppError> {
-    // si nouveau device : créer les elements openmls nécessaire et les mettre dans la db
+    // if new device: create the necessary openmls elements and put them in the db
 
     // TODO
 

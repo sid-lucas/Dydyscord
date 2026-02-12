@@ -18,7 +18,7 @@ pub enum TokenType {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    sub: String,    // Optional. Subject, whom token refers to (user_id ou device_id?)
+    sub: String,    // Optional. Subject, whom token refers to (user_id or device_id?)
     typ: TokenType, // Custom field created by me, type : Auth, Refresh, Access
     //prm: String, // Custom field created by me, Permissions/prm (role)
     aud: String, // Optional. Audience (ex: payments-service)
@@ -73,14 +73,14 @@ pub fn create_jwt(
     typ: TokenType,
     key: &[u8],
 ) -> Result<String, jsonwebtoken::errors::Error> {
-    // Header du token
+    // Token header
     let mut header = Header::new(Algorithm::HS256);
     header.typ = Some("JWT".to_string());
 
-    // Payload du token
+    // Token payload
     let claims = Claims::new(sub, typ);
 
-    // Envoie retour du token (header + payload + signature)
+    // Return the token (header + payload + signature)
     jsonwebtoken::encode::<Claims>(&header, &claims, &EncodingKey::from_secret(key))
 }
 
@@ -90,14 +90,14 @@ pub async fn verify_jwt_with_type(
     typ: TokenType,
     key: &[u8],
 ) -> Result<Response, StatusCode> {
-    // Récupère le cookie
+    // Retrieve the cookie
     let cookie = req
         .headers()
         .get("Cookie")
         .and_then(|v: &axum::http::HeaderValue| v.to_str().ok())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    // Récupère le JWT du cookie
+    // Retrieve the JWT from the cookie
     let token = cookie
         .split(';')
         .map(|cookie: &str| cookie.trim())
@@ -108,7 +108,7 @@ pub async fn verify_jwt_with_type(
     let mut validation = Validation::new(Algorithm::HS256);
     validation.set_audience(&[constant::JWT_AUDIENCE]);
 
-    // Decode token + signature OK + checks de claims (selon Validation)
+    // Decode token + signature OK + claims checks (according to Validation)
     let decoded =
         jsonwebtoken::decode::<Claims>(token, &DecodingKey::from_secret(key), &validation);
 

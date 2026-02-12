@@ -41,7 +41,7 @@ pub enum StorageError {
     #[error("could not perfom query on database")]
     DatabaseQuery,
 
-    // Fichiers / permissions
+    // Files / permissions
     #[error("could not create app directory")]
     AppDirectoryCreate,
 

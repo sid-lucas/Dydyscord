@@ -11,10 +11,10 @@ use crate::mls::{MyProvider, crypto, storage};
 
 use once_cell::sync::OnceCell;
 
-// OnceCell car permet de définir une valeur global initialisée unde fois et accessible partout en lecture
-// static mut : ne serait pas safe / risque de race condition
-// var globale avec mutex : lourd et inutile si valeur change pas
-// stocker dans EncryptedCodec : impossible car Codec impose fonctions statiques
+// OnceCell because it allows defining a global value initialized once and readable everywhere
+// static mut: would not be safe / risk of race condition
+// global var with mutex: heavy and unnecessary if the value does not change
+// store in EncryptedCodec: impossible because Codec enforces static functions
 static EXPORT_KEY: OnceCell<[u8; 32]> = OnceCell::new();
 
 fn init_codec_key(key: [u8; 32]) {
@@ -22,7 +22,7 @@ fn init_codec_key(key: [u8; 32]) {
 }
 
 fn test() -> Result<(), String> {
-    init_codec_key([42u8; 32]); // Clé fixe pour test
+    init_codec_key([42u8; 32]); // Fixed key for test
 
     let user_id = "ahahah";
     let db_path = storage::ensure_db(user_id);
@@ -47,7 +47,7 @@ fn test() -> Result<(), String> {
 
     let ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
 
-    // 1) SignatureKeyPair (stocké via StorageId interne)
+    // 1) SignatureKeyPair (stored via internal StorageId)
     let signer = SignatureKeyPair::new(ciphersuite.signature_algorithm())
         .map_err(|e| format!("generate signer: {e:?}"))?;
     signer
@@ -64,7 +64,7 @@ fn test() -> Result<(), String> {
         return Err("read signer: public key mismatch".to_string());
     }
 
-    // 2) KeyPackageBundle (stocké automatiquement par build)
+    // 2) KeyPackageBundle (stored automatically by build)
     let credential = BasicCredential::new(b"device-1".to_vec());
     let key_package_bundle = KeyPackage::builder()
         .build(

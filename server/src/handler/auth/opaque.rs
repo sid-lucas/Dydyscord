@@ -54,13 +54,13 @@ pub struct LoginStartRequest {
 #[derive(Serialize)]
 pub struct LoginStartResponse {
     pub start_login_response: String, // base64
-    pub user_id: Uuid, // aussi utilisé comme clé-valeur pour retrouver le server_login_state
+    pub user_id: Uuid, // also used as key-value to retrieve server_login_state
 }
 
 #[derive(Deserialize)]
 pub struct LoginFinishRequest {
     pub finish_login_request: String, // base64
-    pub user_id: String,              // clé-valeur pour retrouver le server_login_state
+    pub user_id: String,              // key-value to retrieve server_login_state
 }
 
 pub struct DefaultCipherSuite;
@@ -86,18 +86,18 @@ pub async fn register_start(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterStartRequest>,
 ) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
-    // Récupération du start_register_request du client et décodage/désérialisation
+    // Retrieve start_register_request from the client and decode/deserialize it
     let decoded_request = base64::engine::general_purpose::STANDARD
         .decode(&payload.start_register_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let start_register_request = RegistrationRequest::<DCS>::deserialize(&decoded_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
+    // Retrieve username and compute the corresponding login_lookup
     let username = payload.username;
     let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
 
-    // Check si l'utilisateur existe déjà dans la BDD
+    // Check if the user already exists in the database
     let user = sqlx::query_as!(
         User,
         r#"
@@ -111,13 +111,13 @@ pub async fn register_start(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Si user existe, erreur :
+    // If user exists, error:
     match user {
-        Some(_) => return Err(StatusCode::CONFLICT), // username déjà pris
-        None => (),                                  // continue normalement
+        Some(_) => return Err(StatusCode::CONFLICT), // username already taken
+        None => (),                                  // continue normally
     }
 
-    // Démarrer le register server avec OPAQUE
+    // Start server registration with OPAQUE
     let start = ServerRegistration::<DCS>::start(
         &state.opaque_setup(),
         start_register_request,
@@ -125,11 +125,11 @@ pub async fn register_start(
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Préparation de la request à envoyer au serveur
+    // Prepare the response to send to the client
     let start_register_response =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
-    // Création de la réponse et envoi
+    // Create and send the response
     let response = RegisterStartResponse {
         start_register_response,
     };
@@ -141,24 +141,24 @@ pub async fn register_finish(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterFinishRequest>,
 ) -> Result<StatusCode, StatusCode> {
-    // Récupération du finish_register_request du client et décodage/désérialisation
+    // Retrieve finish_register_request from the client and decode/deserialize it
     let decoded_request = base64::engine::general_purpose::STANDARD
         .decode(&payload.finish_register_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let finish_register_request = RegistrationUpload::<DCS>::deserialize(&decoded_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Finalisation du register en créant le opaque_record à stocker
+    // Finalize registration by creating opaque_record to store
     let opaque_record = ServerRegistration::finish(finish_register_request)
         .serialize()
         .to_vec();
 
-    // Récupération du nom d'utilisateur
+    // Retrieve username
     let username = payload.username;
-    // Recalculer le login_lookup avec le server_pepper et username
+    // Recompute login_lookup with server_pepper and username
     let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
 
-    // Stocker le opaque_record dans la BDD associé au login_lookup
+    // Store opaque_record in the database associated with login_lookup
     sqlx::query!(
         "INSERT INTO users (login_lookup, opaque_record) VALUES ($1, $2)",
         login_lookup,
@@ -175,7 +175,7 @@ pub async fn login_start(
     State(mut state): State<ServerState>,
     Json(payload): Json<LoginStartRequest>,
 ) -> Result<(StatusCode, Json<LoginStartResponse>), StatusCode> {
-    // Récupération du start_login_request du client et décodage/désérialisation
+    // Retrieve start_login_request from the client and decode/deserialize it
     let start_login_request = CredentialRequest::<DCS>::deserialize(
         &base64::engine::general_purpose::STANDARD
             .decode(&payload.start_login_request)
@@ -185,11 +185,11 @@ pub async fn login_start(
 
     let mut server_rng = OsRng;
 
-    // Récupération du nom d'utilisateur et calcul du login_lookup correspondant
+    // Retrieve username and compute the corresponding login_lookup
     let username = payload.username;
     let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
 
-    // Récupération du user correspondant au login_lookup dans la BDD
+    // Retrieve user matching login_lookup from the database
     let user = sqlx::query_as!(
         User,
         r#"
@@ -199,12 +199,12 @@ pub async fn login_start(
         "#,
         login_lookup,
     )
-    // fetch_optional pour ne pas révéler l'existence / non-existence d'un user
+    // fetch_optional to avoid revealing whether a user exists or not
     .fetch_optional(&state.pool())
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Désérialisation du opaque_record si user existe
+    // Deserialize opaque_record if user exists
     let (opaque_record, user_id) = match user {
         Some(user) => {
             let opaque_record = ServerRegistration::<DCS>::deserialize(&user.opaque_record)
@@ -214,7 +214,7 @@ pub async fn login_start(
         None => return Err(StatusCode::NOT_FOUND),
     };
 
-    // Démarrer le login server avec OPAQUE
+    // Start server login with OPAQUE
     let start = ServerLogin::start(
         &mut server_rng,
         &state.opaque_setup(),
@@ -225,7 +225,7 @@ pub async fn login_start(
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Sauvegarde du server_login_state dans Redis avec expiration
+    // Save server_login_state in Redis with expiration
     let redis_key = format!("opaque:login:{}", &user_id);
     let state_bytes: Vec<u8> = start.state.serialize().to_vec();
     let ttl_seconds: u64 = 120;
@@ -235,7 +235,7 @@ pub async fn login_start(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Création de la réponse et envoi
+    // Create and send the response
     let start_login_response =
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
@@ -252,48 +252,48 @@ pub async fn login_finish(
     State(state): State<ServerState>,
     Json(payload): Json<LoginFinishRequest>,
 ) -> Result<CookieJar, StatusCode> {
-    // Création de la clé avec le user_id
+    // Create the key with user_id
     let redis_key = format!("opaque:login:{}", payload.user_id);
 
-    // Récupération du server_login_state depuis Redis
+    // Retrieve server_login_state from Redis
     let state_bytes: Option<Vec<u8>> = state
         .redis()
         .get(&redis_key)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Si la récupération n'a pas fonctionné (key invalide)
+    // If retrieval failed (invalid key)
     let state_bytes: Vec<u8> = match state_bytes {
         Some(v) => v,
         None => return Err(StatusCode::UNAUTHORIZED),
     };
 
-    // Supprimer one-shot (évite replay)
+    // One-shot delete (prevents replay)
     let _: () = state
         .redis()
         .del(&redis_key)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Décode/Désérialise le message final du client
+    // Decode/Deserialize the client's final message
     let finish_login_request = base64::engine::general_purpose::STANDARD
         .decode(&payload.finish_login_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let finish_login_request = CredentialFinalization::<DCS>::deserialize(&finish_login_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Désérialiser server_login_state puis finish()
+    // Deserialize server_login_state then finish()
     let server_login_state = ServerLogin::<DCS>::deserialize(&state_bytes)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let finish = server_login_state
         .finish(finish_login_request, ServerLoginParameters::default())
-        .map_err(|_| StatusCode::UNAUTHORIZED)?; // mauvais mdp ou preuve invalide
+        .map_err(|_| StatusCode::UNAUTHORIZED)?; // wrong password or invalid proof
 
-    // secret partagé entre le client et le serveur
+    // Shared secret between client and server
     let _session_key = finish.session_key;
 
-    // Création du JWT intermédiaire (auth)
+    // Create the intermediate JWT (auth)
     let id = payload.user_id.to_string();
     let token = jwt::create_jwt(
         id.as_str(),
@@ -304,7 +304,7 @@ pub async fn login_finish(
 
     let cookie = Cookie::build((constant::AUTH_HEADER, token))
         .http_only(false) // TODO change
-        .secure(false) // TODO Change: true interdit l'envoi un HTTP. -> false pour test local pour l'instant.
+        .secure(false) // TODO Change: true forbids sending over HTTP. -> false for local testing for now.
         .same_site(SameSite::Strict)
         .path("/")
         .build();

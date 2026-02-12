@@ -38,7 +38,7 @@ fn handle_logged_out() -> Option<AppState> {
 fn handle_logged_in(session: Session) -> Option<AppState> {
     match choice::prompt_logged_in() {
         choice::LoggedInChoice::Test => {
-            // utiliser session ici
+            // use session here
             println!("test");
             Some(AppState::LoggedIn(session))
         }
@@ -72,7 +72,7 @@ fn signup() -> Option<AppState> {
 }
 
 fn login() -> Option<AppState> {
-    // Handshake OPAQUE avec le serveur et récupèration du JWT Auth
+    // OPAQUE handshake with the server and retrieval of JWT Auth
     let (username, password) = match ui::prompt::login() {
         Ok((username, password)) => (username, password),
         Err(e) => {
@@ -81,7 +81,7 @@ fn login() -> Option<AppState> {
         }
     };
 
-    // Ajout des informations de login OPAQUE dans la session
+    // Add OPAQUE login information to the session
     let mut session = match auth::opaque::login(&username, &password) {
         Ok(login_result) => Session::new(login_result),
         Err(e) => {
@@ -90,7 +90,7 @@ fn login() -> Option<AppState> {
         }
     };
 
-    // Initialisation des fichiers de storage local et récupèration du JWT Refresh
+    // Initialize local storage files and retrieve JWT Refresh
     let (device_id, db_key, is_new_device) =
         match database::init_device_storage(session.user_id(), session.export_key()) {
             Ok(result) => result,
@@ -100,17 +100,17 @@ fn login() -> Option<AppState> {
             }
         };
 
-    // Ajout des informations de init device/storage dans la session
+    // Add device/storage initialization information to the session
     session.set_device_id(device_id);
     session.set_db_key(db_key);
 
-    // Ouverture de la connexion de la db et préparation du provider OpenMLS
+    // Open the db connection and prepare the OpenMLS provider
     if let Err(e) = session.set_provider() {
         eprintln!("Login failed: {e}");
         return Some(AppState::LoggedOut);
     }
 
-    // Initialisation de OpenMLS
+    // Initialize OpenMLS
     let _ = mls::identity::init_openmls(is_new_device);
 
     println!("Login successful!");
