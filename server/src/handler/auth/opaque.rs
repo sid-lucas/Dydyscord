@@ -12,7 +12,7 @@ use crate::config::server::ServerState;
 use crate::constant;
 
 use axum::{Json, extract::State, http::StatusCode};
-use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
+use axum_extra::extract::cookie::CookieJar;
 
 use hmac::Mac;
 use opaque_ke::{
@@ -294,19 +294,12 @@ pub async fn login_finish(
 
     // Create the intermediate JWT (auth)
     let id = payload.user_id.to_string();
-    let token = jwt::create_jwt(
+    let cookie = jwt::create_cookie(
         id.as_str(),
         jwt::TokenType::Auth,
-        state.jwt_key().expose_secret(),
+        state.jwt_key().as_ref(),
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let cookie = Cookie::build((constant::AUTH_HEADER, token))
-        .http_only(false) // TODO change
-        .secure(false) // TODO Change: true forbids sending over HTTP. -> false for local testing for now.
-        .same_site(SameSite::Strict)
-        .path("/")
-        .build();
 
     let jar = CookieJar::new().add(cookie);
 

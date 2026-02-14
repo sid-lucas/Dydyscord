@@ -39,8 +39,7 @@ fn handle_logged_out() -> Option<AppState> {
 
 fn handle_logged_in(session: Session) -> Option<AppState> {
     match choice::prompt_logged_in() {
-        choice::LoggedInChoice::TestAuth => test_auth(session),
-        choice::LoggedInChoice::TestRefresh => test_refresh(session),
+        choice::LoggedInChoice::TestSession => test_session(session),
         choice::LoggedInChoice::Logout => {
             drop(session);
             println!("Logged out.");
@@ -89,7 +88,7 @@ fn login() -> Option<AppState> {
         }
     };
 
-    // Initialize local storage files and retrieve JWT Refresh
+    // Initialize local storage files and retrieve Session token
     let (device_id, db_key, is_new_device) =
         match database::init_device_storage(session.user_id(), session.export_key()) {
             Ok(result) => result,
@@ -116,16 +115,11 @@ fn login() -> Option<AppState> {
     Some(AppState::LoggedIn(session))
 }
 
-fn test_auth(session: Session) -> Option<AppState> {
-    if let Err(e) = http::test_auth() {
-        eprintln!("Not autorized (no JWT Auth) : {e}");
+fn test_session(session: Session) -> Option<AppState> {
+    if let Err(e) = http::test_session() {
+        eprintln!("Not autorized (no Session token) : {e}");
+        return Some(AppState::LoggedOut);
     }
-    Some(AppState::LoggedIn(session))
-}
-
-fn test_refresh(session: Session) -> Option<AppState> {
-    if let Err(e) = http::test_refresh() {
-        eprintln!("Not autorized (no JWT Refresh) : {e}");
-    }
+    println!("Your session is valid.");
     Some(AppState::LoggedIn(session))
 }

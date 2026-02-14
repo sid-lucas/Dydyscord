@@ -213,7 +213,7 @@ pub fn init_device_storage(
             // New device detected, initialize with server
             is_new_device = true;
 
-            // Retrieve the new device_id and JWT Refresh
+            // Retrieve the new device_id and Session token
             let device_id = http::create_device()?;
 
             // Store device_id in local db

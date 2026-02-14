@@ -3,23 +3,39 @@ use crate::config::server::ServerState;
 use axum::{
     extract::Request, extract::State, http::StatusCode, middleware::Next, response::Response,
 };
+use axum_extra::extract::cookie::{Cookie, SameSite};
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretSlice};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum TokenType {
     Auth,
-    Access,
-    Refresh,
+    Session,
+}
+
+impl TokenType {
+    pub fn ttl(&self) -> i64 {
+        match self {
+            TokenType::Auth => constant::JWT_AUTH_TTL,
+            TokenType::Session => constant::JWT_SESSION_TTL,
+        }
+    }
+
+    pub fn header(&self) -> &'static str {
+        match self {
+            TokenType::Auth => constant::JWT_AUTH_HEADER,
+            TokenType::Session => constant::JWT_SESSION_HEADER,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     sub: String,    // Optional. Subject, whom token refers to (user_id or device_id)
-    typ: TokenType, // Custom field created by me, type : Auth, Refresh, Access
+    typ: TokenType, // Custom field created by me, type : Auth, Session, Access
     //prm: String, // Custom field created by me, Permissions/prm (role)
     aud: String, // Optional. Audience (ex: payments-service)
     exp: usize, // Required. (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
@@ -30,11 +46,7 @@ pub struct Claims {
 impl Claims {
     pub fn new(sub: &str, typ: TokenType) -> Self {
         let now = Utc::now().timestamp();
-        let ttl = match typ {
-            TokenType::Auth => constant::JWT_AUTH_TTL,
-            TokenType::Access => constant::JWT_ACCESS_TTL,
-            TokenType::Refresh => constant::JWT_REFRESH_TTL,
-        };
+        let ttl = typ.ttl();
 
         Claims {
             sub: sub.to_string(),
@@ -72,10 +84,10 @@ impl Claims {
     }
 }
 
-pub fn create_jwt(
+fn create_jwt(
     sub: &str,
     typ: TokenType,
-    key: &[u8],
+    key: &SecretSlice<u8>,
 ) -> Result<String, jsonwebtoken::errors::Error> {
     // Token header
     let mut header = Header::new(Algorithm::HS256);
@@ -84,8 +96,28 @@ pub fn create_jwt(
     // Token payload
     let claims = Claims::new(sub, typ);
 
-    // Return the token (header + payload + signature)
-    jsonwebtoken::encode::<Claims>(&header, &claims, &EncodingKey::from_secret(key))
+    // Return the token in JWT format (header + payload + signature)
+    jsonwebtoken::encode::<Claims>(
+        &header,
+        &claims,
+        &EncodingKey::from_secret(key.expose_secret()),
+    )
+}
+
+pub fn create_cookie(
+    sub: &str,
+    typ: TokenType,
+    key: &SecretSlice<u8>,
+) -> Result<Cookie<'static>, jsonwebtoken::errors::Error> {
+    let header = typ.header();
+    let jwt = create_jwt(sub, typ, key)?;
+
+    Ok(Cookie::build((header, jwt))
+        .http_only(false) // TODO change
+        .secure(false) // TODO Change: true forbids sending over HTTP. -> false for local testing for now.
+        .same_site(SameSite::Strict)
+        .path("/")
+        .build())
 }
 
 pub async fn verify_jwt_with_type(
@@ -105,7 +137,7 @@ pub async fn verify_jwt_with_type(
     let token = cookie
         .split(';')
         .map(|cookie: &str| cookie.trim())
-        .find_map(|cookie: &str| cookie.strip_prefix(constant::AUTH_HEADER))
+        .find_map(|cookie: &str| cookie.strip_prefix(typ.header()))
         .map(|token: &str| token.trim_start_matches('=').trim())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
@@ -132,20 +164,6 @@ pub async fn verify_jwt_with_type(
     }
 }
 
-pub async fn verify_jwt_access(
-    State(state): State<ServerState>,
-    req: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
-    verify_jwt_with_type(
-        req,
-        next,
-        TokenType::Access,
-        state.jwt_key().expose_secret(),
-    )
-    .await
-}
-
 pub async fn verify_jwt_auth(
     State(state): State<ServerState>,
     req: Request,
@@ -154,7 +172,7 @@ pub async fn verify_jwt_auth(
     verify_jwt_with_type(req, next, TokenType::Auth, state.jwt_key().expose_secret()).await
 }
 
-pub async fn verify_jwt_refresh(
+pub async fn verify_jwt_session(
     State(state): State<ServerState>,
     req: Request,
     next: Next,
@@ -162,7 +180,7 @@ pub async fn verify_jwt_refresh(
     verify_jwt_with_type(
         req,
         next,
-        TokenType::Refresh,
+        TokenType::Session,
         state.jwt_key().expose_secret(),
     )
     .await

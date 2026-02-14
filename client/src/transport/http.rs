@@ -127,8 +127,8 @@ pub fn test_auth() -> Result<(), TransportError> {
     }
 }
 
-pub fn test_refresh() -> Result<(), TransportError> {
-    let url = format!("{SERVER_URL}/test/refresh");
+pub fn test_session() -> Result<(), TransportError> {
+    let url = format!("{SERVER_URL}/test/session");
     let response = CLIENT
         .get(&url)
         .send()

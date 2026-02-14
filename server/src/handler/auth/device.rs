@@ -4,9 +4,8 @@ use crate::database::model::Device;
 use crate::handler::auth::jwt;
 use crate::handler::auth::jwt::Claims;
 use axum::{Extension, Json, extract::State, http::StatusCode};
-use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
+use axum_extra::extract::cookie::CookieJar;
 use redis::AsyncCommands;
-use secrecy::ExposeSecret;
 use uuid::Uuid;
 
 pub async fn create_device(
@@ -24,26 +23,18 @@ pub async fn create_device(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Create the intermediate JWT (auth)
-    let token = jwt::create_jwt(
+    let cookie = jwt::create_cookie(
         device.id.to_string().as_str(),
-        jwt::TokenType::Refresh,
-        state.jwt_key().expose_secret(),
+        jwt::TokenType::Session,
+        state.jwt_key().as_ref(),
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let cookie = Cookie::build((constant::AUTH_HEADER, token))
-        .http_only(false) // TODO change
-        .secure(false) // TODO Change: true forbids sending over HTTP. -> false for local testing for now.
-        .same_site(SameSite::Strict)
-        .path("/")
-        .build();
 
     let redis_key = format!("jwt:{}", &cookie);
     let state_bytes: Vec<u8> = "ok".as_bytes().to_vec(); // We don't need to store any specific state for the device creation, just the existence of the key with the correct TTL is enough for validation in the middleware
     let _: () = state
         .redis()
-        .set_ex(&redis_key, state_bytes, constant::JWT_REFRESH_TTL as u64)
+        .set_ex(&redis_key, state_bytes, constant::JWT_SESSION_TTL as u64)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -67,26 +58,18 @@ pub async fn get_device(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Create the intermediate JWT (auth)
-    let token = jwt::create_jwt(
+    let cookie = jwt::create_cookie(
         device.id.to_string().as_str(),
-        jwt::TokenType::Refresh,
-        state.jwt_key().expose_secret(),
+        jwt::TokenType::Session,
+        state.jwt_key().as_ref(),
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let cookie = Cookie::build((constant::AUTH_HEADER, token))
-        .http_only(false) // TODO change
-        .secure(false) // TODO Change: true forbids sending over HTTP. -> false for local testing for now.
-        .same_site(SameSite::Strict)
-        .path("/")
-        .build();
 
     let redis_key = format!("jwt:{}", &cookie);
     let state_bytes: Vec<u8> = "ok".as_bytes().to_vec(); // We don't need to store any specific state for the device creation, just the existence of the key with the correct TTL is enough for validation in the middleware
     let _: () = state
         .redis()
-        .set_ex(&redis_key, state_bytes, constant::JWT_REFRESH_TTL as u64)
+        .set_ex(&redis_key, state_bytes, constant::JWT_SESSION_TTL as u64)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
