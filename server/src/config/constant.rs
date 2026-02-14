@@ -1,12 +1,10 @@
 pub const JWT_AUDIENCE: &str = "dydyscord-client";
 
 pub const JWT_AUTH_TTL: i64 = 60; // 1 minute
-pub const JWT_ACCESS_TTL: i64 = 60 * 15; // 15 minutes
 pub const JWT_SESSION_TTL: i64 = 60 * 60 * 2; // 2 hours
 
 pub const JWT_AUTH_HEADER: &str = "auth-token";
 pub const JWT_SESSION_HEADER: &str = "session-token";
-pub const JWT_ACCESS_HEADER: &str = "access-token";
 
 pub const SERVER_ADDR: &str = "0.0.0.0:3000";
 
