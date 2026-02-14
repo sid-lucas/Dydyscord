@@ -22,9 +22,21 @@ async fn main() {
         // Routes protected by an Access JWT:
         // None
         // Routes protected by a Refresh JWT:
-        // TODO
+        .route(
+            "/test/refresh",
+            post(handler::root::root).layer(middleware::from_fn_with_state(
+                server_state.clone(),
+                handler::auth::jwt::verify_jwt_refresh,
+            )),
+        )
         // Routes protected by an Auth JWT:
-        // TODO Add route that upgrades our Auth JWT to Refresh JWT
+        .route(
+            "/test/auth",
+            post(handler::root::root).layer(middleware::from_fn_with_state(
+                server_state.clone(),
+                handler::auth::jwt::verify_jwt_auth,
+            )),
+        )
         .route(
             "/device",
             post(handler::auth::device::create_device).layer(middleware::from_fn_with_state(

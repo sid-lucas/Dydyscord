@@ -111,3 +111,33 @@ pub fn get_device() -> Result<(), TransportError> {
         _ => Err(TransportError::Server),
     }
 }
+
+pub fn test_auth() -> Result<(), TransportError> {
+    let url = format!("{SERVER_URL}/test/auth");
+    let response = CLIENT
+        .get(&url)
+        .send()
+        .map_err(|_| TransportError::Network)?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
+        StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
+        _ => Err(TransportError::Server),
+    }
+}
+
+pub fn test_refresh() -> Result<(), TransportError> {
+    let url = format!("{SERVER_URL}/test/refresh");
+    let response = CLIENT
+        .get(&url)
+        .send()
+        .map_err(|_| TransportError::Network)?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
+        StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
+        _ => Err(TransportError::Server),
+    }
+}
