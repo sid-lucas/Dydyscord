@@ -206,8 +206,7 @@ pub fn init_device_storage(
 
     let device_id = match device_id {
         Some(id) => {
-            // Known device, request server to get JWT Refresh on behalf of device_id
-            // TODO http::upgrade_jwt() to get JWT Refresh
+            http::get_device()?; // TODO : Check if the device_id is still valid on the server, if not consider the device as new and re-register
             id
         }
         None => {

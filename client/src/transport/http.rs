@@ -97,15 +97,16 @@ pub fn create_device() -> Result<String, TransportError> {
     }
 }
 
-pub fn test_token_refresh() -> Result<(), TransportError> {
-    let url = format!("{SERVER_URL}/");
+pub fn get_device() -> Result<(), TransportError> {
+    let url = format!("{SERVER_URL}/device");
     let response = CLIENT
-        .post(&url)
+        .get(&url)
         .send()
         .map_err(|_| TransportError::Network)?;
 
     match response.status() {
         StatusCode::OK => Ok(()),
+        StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
         StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
         _ => Err(TransportError::Server),
     }
