@@ -30,7 +30,11 @@ pub struct Claims {
 impl Claims {
     pub fn new(sub: &str, typ: TokenType) -> Self {
         let now = Utc::now().timestamp();
-        let ttl = constant::JWT_TTL;
+        let ttl = match typ {
+            TokenType::Auth => constant::JWT_AUTH_TTL,
+            TokenType::Access => constant::JWT_ACCESS_TTL,
+            TokenType::Refresh => constant::JWT_REFRESH_TTL,
+        };
 
         Claims {
             sub: sub.to_string(),
@@ -148,4 +152,18 @@ pub async fn verify_jwt_auth(
     next: Next,
 ) -> Result<Response, StatusCode> {
     verify_jwt_with_type(req, next, TokenType::Auth, state.jwt_key().expose_secret()).await
+}
+
+pub async fn verify_jwt_refresh(
+    State(state): State<ServerState>,
+    req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    verify_jwt_with_type(
+        req,
+        next,
+        TokenType::Refresh,
+        state.jwt_key().expose_secret(),
+    )
+    .await
 }

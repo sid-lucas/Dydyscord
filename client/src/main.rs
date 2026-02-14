@@ -11,6 +11,8 @@ use auth::session::Session;
 use storage::database;
 use ui::choice;
 
+use crate::transport::http;
+
 fn main() {
     let mut appstate = AppState::LoggedOut;
 
@@ -112,6 +114,11 @@ fn login() -> Option<AppState> {
 
     // Initialize OpenMLS
     let _ = mls::identity::init_openmls(is_new_device);
+
+    http::test_token_refresh().unwrap_or_else(|e| {
+        eprintln!("Token refresh test failed: {e}");
+        std::process::exit(1);
+    });
 
     println!("Login successful!");
     Some(AppState::LoggedIn(session))

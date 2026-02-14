@@ -64,7 +64,7 @@ pub fn opaque_login(payload: LoginStartRequest<'_>) -> Result<LoginStartResponse
     }
 }
 
-pub fn opaque_login_finish(payload: LoginFinishRequest) -> Result<String, TransportError> {
+pub fn opaque_login_finish(payload: LoginFinishRequest) -> Result<(), TransportError> {
     let url = format!("{SERVER_URL}/login/finish");
     let response = CLIENT
         .post(&url)
@@ -73,9 +73,7 @@ pub fn opaque_login_finish(payload: LoginFinishRequest) -> Result<String, Transp
         .map_err(|_| TransportError::Network)?;
 
     match response.status() {
-        StatusCode::OK => Ok(response
-            .text()
-            .map_err(|_| TransportError::InvalidResponse)?),
+        StatusCode::OK => Ok(()),
         StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
         StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
         _ => Err(TransportError::Server),
@@ -94,6 +92,20 @@ pub fn create_device() -> Result<String, TransportError> {
             .text()
             .map_err(|_| TransportError::InvalidResponse)?),
         StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
+        StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
+        _ => Err(TransportError::Server),
+    }
+}
+
+pub fn test_token_refresh() -> Result<(), TransportError> {
+    let url = format!("{SERVER_URL}/");
+    let response = CLIENT
+        .post(&url)
+        .send()
+        .map_err(|_| TransportError::Network)?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
         StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
         _ => Err(TransportError::Server),
     }

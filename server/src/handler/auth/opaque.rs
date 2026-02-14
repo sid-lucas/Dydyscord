@@ -54,7 +54,7 @@ pub struct LoginStartRequest {
 #[derive(Serialize)]
 pub struct LoginStartResponse {
     pub start_login_response: String, // base64
-    pub user_id: Uuid, // also used as key-value to retrieve server_login_state
+    pub user_id: Uuid,                // also used as key-value to retrieve server_login_state
 }
 
 #[derive(Deserialize)]
@@ -228,10 +228,9 @@ pub async fn login_start(
     // Save server_login_state in Redis with expiration
     let redis_key = format!("opaque:login:{}", &user_id);
     let state_bytes: Vec<u8> = start.state.serialize().to_vec();
-    let ttl_seconds: u64 = 120;
     let _: () = state
         .redis()
-        .set_ex(&redis_key, state_bytes, ttl_seconds)
+        .set_ex(&redis_key, state_bytes, constant::REDIS_OPAQUE_STATE_TTL)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -251,7 +250,7 @@ pub async fn login_start(
 pub async fn login_finish(
     State(state): State<ServerState>,
     Json(payload): Json<LoginFinishRequest>,
-) -> Result<CookieJar, StatusCode> {
+) -> Result<(StatusCode, CookieJar), StatusCode> {
     // Create the key with user_id
     let redis_key = format!("opaque:login:{}", payload.user_id);
 
@@ -311,5 +310,5 @@ pub async fn login_finish(
 
     let jar = CookieJar::new().add(cookie);
 
-    Ok(jar)
+    Ok((StatusCode::OK, jar))
 }
