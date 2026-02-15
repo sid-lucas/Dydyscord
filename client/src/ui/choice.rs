@@ -20,6 +20,7 @@ impl fmt::Display for LoggedOutChoice {
 
 #[derive(Debug, Copy, Clone, Selectable)]
 pub enum LoggedInChoice {
+    AddFriend,
     TestSession,
     Logout,
 }
@@ -27,6 +28,7 @@ pub enum LoggedInChoice {
 impl fmt::Display for LoggedInChoice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            LoggedInChoice::AddFriend => write!(f, "Add a friend"),
             LoggedInChoice::TestSession => write!(f, "Test session"),
             LoggedInChoice::Logout => write!(f, "Log Out"),
         }

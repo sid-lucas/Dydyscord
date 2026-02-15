@@ -39,6 +39,7 @@ fn handle_logged_out() -> Option<AppState> {
 
 fn handle_logged_in(session: Session) -> Option<AppState> {
     match choice::prompt_logged_in() {
+        choice::LoggedInChoice::AddFriend => add_friend(session),
         choice::LoggedInChoice::TestSession => test_session(session),
         choice::LoggedInChoice::Logout => {
             drop(session);
@@ -112,6 +113,14 @@ fn login() -> Option<AppState> {
     let _ = mls::identity::init_openmls(is_new_device);
 
     println!("Login successful!");
+    Some(AppState::LoggedIn(session))
+}
+
+fn add_friend(session: Session) -> Option<AppState> {
+    if let Err(e) = http::test_session() {
+        eprintln!("An error occured : {e}");
+    }
+    println!("Your request has been sent.");
     Some(AppState::LoggedIn(session))
 }
 
