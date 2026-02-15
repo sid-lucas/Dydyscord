@@ -30,53 +30,14 @@ CREATE TABLE IF NOT EXISTS devices (
 
 CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id);
 
--- Friend requests (pending/accepted/declined/expired)
-CREATE TABLE IF NOT EXISTS friend_requests (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    from_user_id UUID NOT NULL,
-    to_user_id   UUID NOT NULL,
-    status       TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'accepted', 'declined', 'expired')),
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (from_user_id <> to_user_id),
-    CONSTRAINT fk_friend_requests_from_user
-        FOREIGN KEY (from_user_id)
-        REFERENCES users(id)
+CREATE TABLE IF NOT EXISTS key_packages (
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    device_id UUID NOT NULL,
+    key_package BYTEA NOT NULL,
+    CONSTRAINT fk_key_packages_device
+        FOREIGN KEY (device_id)
+        REFERENCES devices(id)
         ON DELETE CASCADE,
-    CONSTRAINT fk_friend_requests_to_user
-        FOREIGN KEY (to_user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-    CONSTRAINT uq_friend_requests_from_to UNIQUE (from_user_id, to_user_id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_friend_requests_to_user_id
-    ON friend_requests (to_user_id);
-
-CREATE INDEX IF NOT EXISTS idx_friend_requests_from_user_id
-    ON friend_requests (from_user_id);
-
--- Final friend relations (1 row per relation)
-CREATE TABLE IF NOT EXISTS friend_edges (
-    user_id_low  UUID NOT NULL,
-    user_id_high UUID NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (user_id_low <> user_id_high),
-    CHECK (user_id_low < user_id_high),
-    CONSTRAINT fk_friend_edges_low
-        FOREIGN KEY (user_id_low)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_friend_edges_high
-        FOREIGN KEY (user_id_high)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-    CONSTRAINT pk_friend_edges PRIMARY KEY (user_id_low, user_id_high)
-);
-
-CREATE INDEX IF NOT EXISTS idx_friend_edges_low
-    ON friend_edges (user_id_low);
-
-CREATE INDEX IF NOT EXISTS idx_friend_edges_high
-    ON friend_edges (user_id_high);

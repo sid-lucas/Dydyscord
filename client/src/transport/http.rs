@@ -4,6 +4,7 @@ use crate::auth::opaque::{
 };
 use crate::transport::error::TransportError;
 use once_cell::sync::Lazy;
+use openmls::prelude::KeyPackageBundle;
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
 
@@ -101,6 +102,25 @@ pub fn get_device() -> Result<(), TransportError> {
     let url = format!("{SERVER_URL}/device");
     let response = CLIENT
         .get(&url)
+        .send()
+        .map_err(|_| TransportError::Network)?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
+        StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
+        _ => Err(TransportError::Server),
+    }
+}
+
+pub fn send_key_packages(
+    device_id: String,
+    key_packages: Vec<KeyPackageBundle>,
+) -> Result<(), TransportError> {
+    let url = format!("{SERVER_URL}/device/{device_id}/keypackages");
+    let response = CLIENT
+        .post(&url)
+        .json(&key_packages)
         .send()
         .map_err(|_| TransportError::Network)?;
 

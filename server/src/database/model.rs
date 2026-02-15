@@ -18,3 +18,12 @@ pub struct Device {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct KeyPackage {
+    pub id: i64,
+    pub device_id: Uuid,
+    pub key_package: Vec<u8>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}

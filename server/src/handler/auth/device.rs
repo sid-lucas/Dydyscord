@@ -5,7 +5,9 @@ use crate::handler::auth::jwt;
 use crate::handler::auth::jwt::Claims;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
+use openmls::prelude::KeyPackageBundle;
 use redis::AsyncCommands;
+use rkyv::{Archive, Deserialize, Serialize, deserialize, rancor::Error};
 use uuid::Uuid;
 
 pub async fn create_device(
@@ -76,4 +78,28 @@ pub async fn get_device(
     let jar = CookieJar::new().add(cookie);
 
     Ok((StatusCode::OK, jar))
+}
+
+pub async fn update_key_packages(
+    State(state): State<ServerState>,
+    Json(payload): Json<Vec<KeyPackageBundle>>,
+    Extension(claims_jwt): Extension<Claims>,
+) -> Result<StatusCode, StatusCode> {
+    let device_id = Uuid::parse_str(claims_jwt.sub()).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    for key_package in payload {
+        // Serialize the KeyPackageBundle using rkyv
+        let key_package_bytes =
+            rkyv::to_bytes::<Error>(&key_package).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?; // TODO : Make it work with rkyv
+        sqlx::query!(
+            r#"INSERT INTO key_packages (device_id, key_package) VALUES ($1, $2)"#,
+            device_id,
+            key_package_bytes
+        )
+        .execute(&state.pool())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+
+    Ok(StatusCode::OK)
 }
