@@ -1,22 +1,32 @@
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum TransportError {
-    #[error("could not reach server")]
+    // --- Transport / IO ---
+    #[error("network error")]
     Network,
 
-    #[error("server error")]
-    Server,
+    // --- HTTP protocol ---
+    #[error("unexpected status code")]
+    UnexpectedStatus,
 
-    #[error("invalid server response")]
+    #[error("invalid or malformed response body")]
     InvalidResponse,
 
-    #[error("bad request sent to server")]
+    // --- Standard HTTP statuses ---
+    #[error("bad request")]
     BadRequest,
 
-    #[error("unauthorized access")]
+    #[error("unauthorized")]
     Unauthorized,
 
+    #[error("conflict")]
+    Conflict,
+
+    #[error("internal server error")]
+    Internal,
+
+    // --- Domain logic ---
     #[error("username already exists")]
     UsernameTaken,
 

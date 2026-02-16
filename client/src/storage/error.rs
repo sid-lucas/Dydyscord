@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum StorageError {
-    // Crypto
+    // --- Crypto ---
     #[error("could not encrypt with wrap key")]
     Encrypt,
 
@@ -21,14 +21,14 @@ pub enum StorageError {
     #[error("invalid envelope version")]
     EnvelopeVersion,
 
-    // Codec / serialization
+    // --- Codec / serialization ---
     #[error("could not serialize CBOR codec")]
     CborCodecSerialize,
 
     #[error("could not deserialize CBOR codec")]
     CborCodecDeserialize,
 
-    // Database / SQLite
+    // --- Database / SQLite ---
     #[error("could not connect to database")]
     DatabaseConnect,
 
@@ -41,7 +41,7 @@ pub enum StorageError {
     #[error("could not perfom query on database")]
     DatabaseQuery,
 
-    // Files / permissions
+    // --- Files / permissions ---
     #[error("could not create app directory")]
     AppDirectoryCreate,
 
@@ -63,9 +63,9 @@ pub enum StorageError {
     #[error("could not store db key")]
     DbKeyStore,
 
-    // App state
+    // --- App state ---
     #[error("device_id was not found in database")]
-    DeviceIdMissing, // TODO unused
+    DeviceIdMissing,
 
     #[error("public signature key was not found in database")]
     PubKeyMissing,

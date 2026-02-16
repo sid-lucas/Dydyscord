@@ -247,7 +247,8 @@ pub fn init_device_storage(
             is_new_device = true;
 
             // Retrieve the new device_id and Session token
-            let device_id = http::create_device()?;
+            let response = http::create_device()?;
+            let device_id = response.device_id.to_string();
 
             // Store device_id in local db
             store_device_id(&db_key, user_id, device_id.as_str())?;

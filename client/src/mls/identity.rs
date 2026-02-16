@@ -1,5 +1,5 @@
 use base64::Engine;
-use common::WelcomeStoreRequest;
+use common::{KeyPackagesUploadRequest, UserKeyPackageRequest, WelcomeStoreRequest};
 use openmls::prelude::*;
 use openmls::prelude::tls_codec::Serialize as TlsSerialize;
 use openmls_basic_credential::SignatureKeyPair;
@@ -111,7 +111,7 @@ pub fn init_openmls(
             kp_bytes.push(bytes);
         }
         // serialize the key packages and send them to the server to be stored in the db
-        http::send_key_packages(device_id, kp_bytes)?;
+        http::send_key_packages(device_id, KeyPackagesUploadRequest { key_packages: kp_bytes })?;
     }
 
     Ok(())
@@ -124,7 +124,9 @@ pub fn init_group(
     provider: &MyProvider,
     user_to_add: &str,
 ) -> Result<(), AppError> {
-    let response = http::create_group(user_to_add)?;
+    let response = http::create_group(UserKeyPackageRequest {
+        username: user_to_add.to_string(),
+    })?;
 
     // Retrieve the public signature key
     let pubkey_b64 = storage::database::read_signature_pub_key(db_key, user_id)?;

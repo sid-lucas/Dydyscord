@@ -1,5 +1,9 @@
 use openmls::prelude::Ciphersuite;
 
+pub const SERVER_URL: &str = "http://localhost:3000";
+
+pub const HTTP_TIMEOUT_SECS: u64 = 5; // TODO : Change to 10sec for prod use
+
 pub const APP_NAME: &str = "dydyscord";
 
 pub const DB_EXTENSION: &str = ".db";
