@@ -1,3 +1,4 @@
+use DefaultCipherSuite as DCS;
 use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
 use base64::Engine;
@@ -5,9 +6,8 @@ use common::{
     OpaqueLoginFinishRequest, OpaqueLoginStartRequest, OpaqueLoginStartResponse,
     OpaqueRegisterFinishRequest, OpaqueRegisterStartRequest, OpaqueRegisterStartResponse,
 };
-use DefaultCipherSuite as DCS;
-use opaque_ke::argon2::Argon2;
 use opaque_ke::CipherSuite;
+use opaque_ke::argon2::Argon2;
 use opaque_ke::{
     CredentialFinalization, CredentialRequest, RegistrationRequest, RegistrationUpload,
     ServerLogin, ServerLoginParameters, ServerRegistration,
@@ -15,10 +15,11 @@ use opaque_ke::{
 use rand::rngs::OsRng;
 use redis::AsyncCommands;
 
-use crate::auth::{self, jwt};
+use crate::handler::jwt;
 use crate::config::server::ServerState;
 use crate::constant;
 use crate::database::model::User;
+use crate::handler;
 
 pub struct DefaultCipherSuite;
 
@@ -41,7 +42,7 @@ pub async fn register_start(
 
     // Retrieve username and compute the corresponding login_lookup
     let username = payload.username;
-    let login_lookup = auth::login_lookup(&state.pepper(), &username);
+    let login_lookup = handler::login_lookup(&state.pepper(), &username);
 
     // Check if the user already exists in the database
     let user = sqlx::query_as!(
@@ -102,7 +103,7 @@ pub async fn register_finish(
     // Retrieve username
     let username = payload.username;
     // Recompute login_lookup with server_pepper and username
-    let login_lookup = auth::login_lookup(&state.pepper(), &username);
+    let login_lookup = handler::login_lookup(&state.pepper(), &username);
 
     // Store opaque_record in the database associated with login_lookup
     sqlx::query!(
@@ -133,7 +134,7 @@ pub async fn login_start(
 
     // Retrieve username and compute the corresponding login_lookup
     let username = payload.username;
-    let login_lookup = auth::login_lookup(&state.pepper(), &username);
+    let login_lookup = handler::login_lookup(&state.pepper(), &username);
 
     // Retrieve user matching login_lookup from the database
     let user = sqlx::query_as!(

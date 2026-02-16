@@ -24,37 +24,35 @@ async fn main() {
             "/test/session",
             get(handler::root::root).layer(middleware::from_fn_with_state(
                 server_state.clone(),
-                handler::auth::jwt::verify_jwt_session,
+                handler::jwt::verify_jwt_session,
             )),
         )
         .route(
             "/device/{id}/keypackages",
-            post(handler::auth::device::update_key_packages).layer(middleware::from_fn_with_state(
+            post(handler::mls::update_key_packages).layer(middleware::from_fn_with_state(
                 server_state.clone(),
-                handler::auth::jwt::verify_jwt_session,
+                handler::jwt::verify_jwt_session,
             )),
         )
         .route(
             "/user/keypackage", // TODO : Change route name?
-            post(handler::auth::device::get_keypackage_from_username).layer(
-                middleware::from_fn_with_state(
-                    server_state.clone(),
-                    handler::auth::jwt::verify_jwt_session,
-                ),
-            ),
-        )
-        .route(
-            "/welcome",
-            post(handler::auth::device::store_welcome).layer(middleware::from_fn_with_state(
+            post(handler::mls::get_keypackage_from_username).layer(middleware::from_fn_with_state(
                 server_state.clone(),
-                handler::auth::jwt::verify_jwt_session,
+                handler::jwt::verify_jwt_session,
             )),
         )
         .route(
             "/welcome",
-            get(handler::auth::device::fetch_welcome).layer(middleware::from_fn_with_state(
+            post(handler::mls::store_welcome).layer(middleware::from_fn_with_state(
                 server_state.clone(),
-                handler::auth::jwt::verify_jwt_session,
+                handler::jwt::verify_jwt_session,
+            )),
+        )
+        .route(
+            "/welcome",
+            get(handler::mls::fetch_welcome).layer(middleware::from_fn_with_state(
+                server_state.clone(),
+                handler::jwt::verify_jwt_session,
             )),
         )
         // Routes protected by an Auth JWT:
@@ -62,14 +60,14 @@ async fn main() {
             "/device",
             post(handler::auth::device::create_device).layer(middleware::from_fn_with_state(
                 server_state.clone(),
-                handler::auth::jwt::verify_jwt_auth,
+                handler::jwt::verify_jwt_auth,
             )),
         )
         .route(
             "/device",
             get(handler::auth::device::get_device).layer(middleware::from_fn_with_state(
                 server_state.clone(),
-                handler::auth::jwt::verify_jwt_auth,
+                handler::jwt::verify_jwt_auth,
             )),
         )
         // Open routes:
