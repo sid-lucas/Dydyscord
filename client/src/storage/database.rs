@@ -168,6 +168,38 @@ pub fn read_device_id(db_key: &SecretSlice<u8>, user_id: &str) -> Result<Option<
     Ok(device_id)
 }
 
+pub fn store_signature_pub_key(
+    db_key: &SecretSlice<u8>,
+    user_id: &str,
+    signature_public_key_b64: &str,
+) -> Result<(), AppError> {
+    let conn = open_sqlcipher(db_key, user_id)?;
+    ensure_app_state_table(&conn)?;
+
+    conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('signature_public_key', ?1)",
+        params![signature_public_key_b64],
+    )
+    .map_err(|_| StorageError::DatabaseQuery)?;
+
+    Ok(())
+}
+
+pub fn read_signature_pub_key(db_key: &SecretSlice<u8>, user_id: &str) -> Result<String, AppError> {
+    let conn = open_sqlcipher(db_key, user_id)?;
+    ensure_app_state_table(&conn)?;
+
+    let pub_key: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_state WHERE key = 'signature_public_key' LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|_| StorageError::DatabaseQuery)?;
+
+    pub_key.ok_or(StorageError::DatabaseQuery.into())
+}
+
 // Check whether a db + db_key already exist (device exists)
 // or whether one is missing (device does not exist and purge on inconsistency)
 pub fn reconcile_device_storage(user_id: &str) -> bool {

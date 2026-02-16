@@ -66,4 +66,7 @@ pub enum StorageError {
     // App state
     #[error("device_id was not found in database")]
     DeviceIdMissing, // TODO unused
+
+    #[error("public signature key was not found in database")]
+    PubKeyMissing,
 }

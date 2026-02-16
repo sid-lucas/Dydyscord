@@ -111,7 +111,14 @@ fn login() -> Option<AppState> {
     }
 
     // Initialize OpenMLS
-    let _ = mls::identity::init_openmls(is_new_device, device_id);
+    // TODO : Use of "unwrap", change into something clean, even tho it can't be "None" at this point...
+    let _ = mls::identity::init_openmls(
+        session.db_key().unwrap(),
+        session.user_id(),
+        session.device_id().unwrap(),
+        session.provider().unwrap(),
+        is_new_device,
+    );
 
     println!("Login successful!");
     Some(AppState::LoggedIn(session))
@@ -134,15 +141,14 @@ fn create_group(session: Session) -> Option<AppState> {
         }
     };
 
-    let response = match http::create_group(&username) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("An error occured : {e}");
-            return Some(AppState::LoggedOut);
-        }
-    };
-
-    dbg!(response);
+    // TODO : Change use of "unwrap", even tho provider cannot be "None" here...
+    mls::identity::init_group(
+        session.db_key().unwrap(),
+        session.user_id(),
+        session.device_id().unwrap(),
+        session.provider().unwrap(),
+        &username,
+    );
 
     println!("Creating group and inviting: {username}");
     Some(AppState::LoggedIn(session))
