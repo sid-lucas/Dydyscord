@@ -3,7 +3,6 @@ use axum::{
     routing::{get, post},
 };
 use config::constant;
-use handler::auth;
 
 use crate::config::server::{self};
 

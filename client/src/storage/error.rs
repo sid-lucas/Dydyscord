@@ -64,9 +64,6 @@ pub enum StorageError {
     DbKeyStore,
 
     // --- App state ---
-    #[error("device_id was not found in database")]
-    DeviceIdMissing,
-
     #[error("public signature key was not found in database")]
     PubKeyMissing,
 }

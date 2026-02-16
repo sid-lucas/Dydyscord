@@ -196,9 +196,10 @@ pub fn read_signature_pub_key(db_key: &SecretSlice<u8>, user_id: &str) -> Result
             [],
             |row| row.get(0),
         )
+        .optional()
         .map_err(|_| StorageError::DatabaseQuery)?;
 
-    pub_key.ok_or(StorageError::DatabaseQuery.into())
+    pub_key.ok_or(StorageError::PubKeyMissing.into())
 }
 
 // Check whether a db + db_key already exist (device exists)
