@@ -39,6 +39,7 @@ fn handle_logged_out() -> Option<AppState> {
 
 fn handle_logged_in(session: Session) -> Option<AppState> {
     match choice::prompt_logged_in() {
+        choice::LoggedInChoice::CreateGroup => create_group(session),
         choice::LoggedInChoice::AddFriend => add_friend(session),
         choice::LoggedInChoice::TestSession => test_session(session),
         choice::LoggedInChoice::Logout => {
@@ -121,6 +122,29 @@ fn add_friend(session: Session) -> Option<AppState> {
         eprintln!("An error occured : {e}");
     }
     println!("Your request has been sent.");
+    Some(AppState::LoggedIn(session))
+}
+
+fn create_group(session: Session) -> Option<AppState> {
+    let username = match ui::prompt::invite_username() {
+        Ok(username) => username,
+        Err(e) => {
+            eprintln!("Could not read username: {e}");
+            return Some(AppState::LoggedIn(session));
+        }
+    };
+
+    let response = match http::create_group(&username) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("An error occured : {e}");
+            return Some(AppState::LoggedOut);
+        }
+    };
+
+    dbg!(response);
+
+    println!("Creating group and inviting: {username}");
     Some(AppState::LoggedIn(session))
 }
 

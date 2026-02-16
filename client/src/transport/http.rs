@@ -2,9 +2,9 @@ use crate::auth::opaque::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
     RegisterStartRequest, RegisterStartResponse,
 };
+use crate::mls::identity::DeviceKeyPackage;
 use crate::transport::error::TransportError;
 use once_cell::sync::Lazy;
-use openmls::prelude::KeyPackageBundle;
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
 
@@ -132,15 +132,16 @@ pub fn send_key_packages(
     }
 }
 
-pub fn test_auth() -> Result<(), TransportError> {
-    let url = format!("{SERVER_URL}/test/auth");
+pub fn create_group(user: &str) -> Result<Vec<DeviceKeyPackage>, TransportError> {
+    let url = format!("{SERVER_URL}/user/keypackage"); // TODO : change route name
     let response = CLIENT
         .get(&url)
+        .json(user)
         .send()
         .map_err(|_| TransportError::Network)?;
 
     match response.status() {
-        StatusCode::OK => Ok(()),
+        StatusCode::OK => response.json().map_err(|_| TransportError::InvalidResponse),
         StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
         StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
         _ => Err(TransportError::Server),

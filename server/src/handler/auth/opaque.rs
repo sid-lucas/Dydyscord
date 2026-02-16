@@ -7,20 +7,18 @@ use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::auth::jwt;
+use crate::auth::{self, jwt};
 use crate::config::server::ServerState;
 use crate::constant;
 
 use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
 
-use hmac::Mac;
 use opaque_ke::{
     CredentialFinalization, CredentialRequest, RegistrationRequest, RegistrationUpload,
     ServerLogin, ServerLoginParameters, ServerRegistration,
 };
 use redis::AsyncCommands;
-use secrecy::ExposeSecret;
 
 use crate::database::model::User;
 
@@ -71,17 +69,6 @@ impl CipherSuite for DefaultCipherSuite {
     type Ksf = Argon2<'static>;
 }
 
-fn login_lookup(pepper: &[u8], username: &str) -> Vec<u8> {
-    let normalized = username.trim().to_lowercase();
-
-    let mut mac =
-        hmac::Hmac::<sha2::Sha256>::new_from_slice(pepper).expect("HMAC can take key of any size");
-
-    mac.update(normalized.as_bytes());
-
-    mac.finalize().into_bytes().to_vec()
-}
-
 pub async fn register_start(
     State(state): State<ServerState>,
     Json(payload): Json<RegisterStartRequest>,
@@ -95,7 +82,7 @@ pub async fn register_start(
 
     // Retrieve username and compute the corresponding login_lookup
     let username = payload.username;
-    let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
+    let login_lookup = auth::login_lookup(&state.pepper(), &username);
 
     // Check if the user already exists in the database
     let user = sqlx::query_as!(
@@ -156,7 +143,7 @@ pub async fn register_finish(
     // Retrieve username
     let username = payload.username;
     // Recompute login_lookup with server_pepper and username
-    let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
+    let login_lookup = auth::login_lookup(&state.pepper(), &username);
 
     // Store opaque_record in the database associated with login_lookup
     sqlx::query!(
@@ -187,7 +174,7 @@ pub async fn login_start(
 
     // Retrieve username and compute the corresponding login_lookup
     let username = payload.username;
-    let login_lookup = login_lookup(&state.pepper().expose_secret(), &username);
+    let login_lookup = auth::login_lookup(&state.pepper(), &username);
 
     // Retrieve user matching login_lookup from the database
     let user = sqlx::query_as!(
@@ -294,12 +281,8 @@ pub async fn login_finish(
 
     // Create the intermediate JWT (auth)
     let id = payload.user_id.to_string();
-    let cookie = jwt::create_cookie(
-        id.as_str(),
-        jwt::TokenType::Auth,
-        state.jwt_key().as_ref(),
-    )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let cookie = jwt::create_cookie(id.as_str(), jwt::TokenType::Auth, state.jwt_key().as_ref())
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let jar = CookieJar::new().add(cookie);
 

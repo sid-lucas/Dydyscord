@@ -29,13 +29,21 @@ async fn main() {
                 handler::auth::jwt::verify_jwt_session,
             )),
         )
-        // TODO : Mettre dans session??
         .route(
             "/device/{id}/keypackages",
             post(handler::auth::device::update_key_packages).layer(middleware::from_fn_with_state(
                 server_state.clone(),
                 handler::auth::jwt::verify_jwt_session,
             )),
+        )
+        .route(
+            "/user/keypackage", // TODO : Change route name?
+            get(handler::auth::device::get_keypackage_from_username).layer(
+                middleware::from_fn_with_state(
+                    server_state.clone(),
+                    handler::auth::jwt::verify_jwt_session,
+                ),
+            ),
         )
         // Routes protected by an Auth JWT:
         .route(

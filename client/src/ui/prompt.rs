@@ -24,3 +24,9 @@ pub fn login() -> Result<(String, String), UiError> {
 
     Ok((username, password))
 }
+
+pub fn invite_username() -> Result<String, UiError> {
+    Text::new("Enter the username to invite:")
+        .prompt()
+        .map_err(|_| UiError::Username)
+}

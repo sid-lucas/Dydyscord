@@ -2,6 +2,7 @@
 
 TODO :
 - Est-ce vraiment nécessaire de stocker les JWT dans redis ? ca permet la revokation et tt mais est-ce qu'on ne s'en foutrait pas..?
+- Garder le JWT Session dans la struct Session du client ?
 
 - Ajouter une étape de validation mail pour l'inscription -> permet privacy-first, n'expose pas le fait que l'utilisateur existe deja.
 - Login timing attack : Si le login fail, continuer de faire les mêmes opérations dans le backend avec un DUMMY_USER et DUMMY_PASSWORD

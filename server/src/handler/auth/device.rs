@@ -1,8 +1,9 @@
 use crate::config::constant;
 use crate::config::server::ServerState;
-use crate::database::model::Device;
-use crate::handler::auth::jwt;
+use crate::database::model::{Device, KeyPackage, User};
 use crate::handler::auth::jwt::Claims;
+use crate::handler::auth::{self, jwt};
+
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
 use openmls::prelude::{
@@ -12,7 +13,14 @@ use openmls::prelude::{
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
 use redis::AsyncCommands;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Serialize)]
+pub struct DeviceKeyPackage {
+    pub device_id: Uuid,
+    pub key_package: Vec<u8>,
+}
 
 pub async fn create_device(
     State(state): State<ServerState>,
@@ -115,3 +123,116 @@ pub async fn update_key_packages(
 
     Ok(StatusCode::OK)
 }
+
+pub async fn get_keypackage_from_username(
+    State(state): State<ServerState>,
+    Json(payload): Json<String>,
+) -> Result<(StatusCode, Json<Vec<DeviceKeyPackage>>), StatusCode> {
+    // Retrieve username and compute the corresponding login_lookup
+    let login_lookup = auth::login_lookup(&state.pepper(), &payload);
+
+    // Atomically selects and deletes the oldest key_package per device for the given user, returning the consumed key packages.
+    // Ensures one-time consumption and avoids race conditions.
+    let out = sqlx::query_as!(
+        DeviceKeyPackage,
+        r#"
+        WITH candidates AS (
+        SELECT
+            kp.id,
+            kp.device_id,
+            kp.key_package,
+            row_number() OVER (
+            PARTITION BY kp.device_id
+            ORDER BY kp.created_at ASC, kp.id ASC
+            ) AS rn
+        FROM users u
+        JOIN devices d ON d.user_id = u.id
+        JOIN key_packages kp ON kp.device_id = d.id
+        WHERE u.login_lookup = $1
+        ),
+        to_delete AS (
+        SELECT id, device_id, key_package
+        FROM candidates
+        WHERE rn = 1
+        )
+        DELETE FROM key_packages kp
+        USING to_delete td
+        WHERE kp.id = td.id
+        RETURNING td.device_id, td.key_package
+        "#,
+        login_lookup
+    )
+    .fetch_all(&state.pool())
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok((StatusCode::OK, Json(out)))
+}
+
+/* Old function, to delete
+
+pub async fn get_keypackage_from_username_old(
+    State(state): State<ServerState>,
+    Json(payload): Json<String>,
+) -> Result<(StatusCode, Json<Vec<DeviceKeyPackage>>), StatusCode> {
+    // Retrieve username and compute the corresponding login_lookup
+    let login_lookup = auth::login_lookup(&state.pepper(), &payload);
+
+    // Get the user from the login_lookup
+    let user = sqlx::query_as!(
+        User,
+        r#"
+        SELECT id, login_lookup, opaque_record, created_at, updated_at
+        FROM users
+        WHERE login_lookup = $1
+        "#,
+        login_lookup,
+    )
+    .fetch_optional(&state.pool())
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Get all the devices of the user_id
+    let devices = sqlx::query_as!(
+        Device,
+        r#"
+        SELECT id, user_id, created_at, updated_at
+        FROM devices
+        WHERE user_id = $1
+        "#,
+        user.id
+    )
+    .fetch_all(&state.pool())
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Get one keypackage for all the device_id
+    let mut out = Vec::new();
+    for device in devices {
+        let kp = sqlx::query_as!(
+            KeyPackage,
+            r#"
+            SELECT id, device_id, key_package, created_at, updated_at
+            FROM key_packages
+            WHERE device_id = $1
+            ORDER BY created_at
+            LIMIT 1
+            "#,
+            device.id
+        )
+        .fetch_optional(&state.pool())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        if let Some(kp) = kp {
+            out.push(DeviceKeyPackage {
+                device_id: device.id,
+                key_package: kp.key_package,
+            });
+        }
+    }
+
+    Ok((StatusCode::OK, Json(out)))
+}
+ */

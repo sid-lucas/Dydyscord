@@ -2,12 +2,21 @@ use openmls::prelude::tls_codec::Serialize;
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_traits::OpenMlsProvider;
+use serde::Deserialize;
 
 use crate::config::constant;
 use crate::error::AppError;
 use crate::mls::error::MlsError;
 use crate::transport::http;
 use openmls_rust_crypto::OpenMlsRustCrypto;
+
+// TODO Rename file, does not correspond to what it does
+
+#[derive(Deserialize, Debug)]
+pub struct DeviceKeyPackage {
+    pub device_id: String, // ou Uuid si tu veux
+    pub key_package: Vec<u8>,
+}
 
 // A helper to create and store credentials.
 fn generate_credential_with_key(
