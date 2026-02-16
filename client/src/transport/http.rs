@@ -2,7 +2,7 @@ use crate::auth::opaque::{
     LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
     RegisterStartRequest, RegisterStartResponse,
 };
-use crate::mls::identity::DeviceKeyPackage;
+use crate::mls::identity::{DeviceKeyPackage, WelcomePayload, WelcomeResponse};
 use crate::transport::error::TransportError;
 use once_cell::sync::Lazy;
 use reqwest::StatusCode;
@@ -137,6 +137,37 @@ pub fn create_group(user: &str) -> Result<Vec<DeviceKeyPackage>, TransportError>
     let response = CLIENT
         .get(&url)
         .json(user)
+        .send()
+        .map_err(|_| TransportError::Network)?;
+
+    match response.status() {
+        StatusCode::OK => response.json().map_err(|_| TransportError::InvalidResponse),
+        StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
+        StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
+        _ => Err(TransportError::Server),
+    }
+}
+
+pub fn send_welcome(payload: WelcomePayload) -> Result<(), TransportError> {
+    let url = format!("{SERVER_URL}/welcome");
+    let response = CLIENT
+        .post(&url)
+        .json(&payload)
+        .send()
+        .map_err(|_| TransportError::Network)?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
+        StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
+        _ => Err(TransportError::Server),
+    }
+}
+
+pub fn fetch_welcome() -> Result<Vec<WelcomeResponse>, TransportError> {
+    let url = format!("{SERVER_URL}/welcome");
+    let response = CLIENT
+        .get(&url)
         .send()
         .map_err(|_| TransportError::Network)?;
 

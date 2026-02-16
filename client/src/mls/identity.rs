@@ -1,10 +1,11 @@
 use base64::Engine;
-use openmls::prelude::tls_codec::Serialize;
+use openmls::prelude::tls_codec::Serialize as TlsSerialize;
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
+use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
 use secrecy::SecretSlice;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::config::constant;
 use crate::error::AppError;
@@ -12,7 +13,6 @@ use crate::mls::error::MlsError;
 use crate::mls::provider::MyProvider;
 use crate::storage;
 use crate::transport::http;
-use openmls_rust_crypto::OpenMlsRustCrypto;
 
 // TODO Rename file, does not correspond to what it does
 
@@ -20,6 +20,17 @@ use openmls_rust_crypto::OpenMlsRustCrypto;
 pub struct DeviceKeyPackage {
     pub device_id: String, // ou Uuid si tu veux
     pub key_package: Vec<u8>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct WelcomePayload {
+    pub device_ids: Vec<String>,
+    pub welcome_b64: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct WelcomeResponse {
+    pub welcome_b64: String,
 }
 
 // A helper to create and store credentials.
@@ -142,14 +153,14 @@ pub fn init_group(
     let (signer, credential_with_key) =
         load_signer_and_credential(provider, device_id, signature_pubkey)?;
 
+    // TODO: set to false if we want privacy-first and send ratchet tree out-of-band
+    let cfg = MlsGroupCreateConfig::builder()
+        .use_ratchet_tree_extension(true)
+        .build();
+
     // Create the group with the user information.
-    let mut new_group = MlsGroup::new(
-        provider,
-        &signer,
-        &MlsGroupCreateConfig::default(),
-        credential_with_key,
-    )
-    .expect("An unexpected error occurred.");
+    let mut new_group = MlsGroup::new(provider, &signer, &cfg, credential_with_key)
+        .map_err(|_| MlsError::GroupCreate)?;
 
     // Deserialize and verify keypackage(s) received
     let mut key_packages = Vec::with_capacity(response.len());
@@ -163,7 +174,7 @@ pub fn init_group(
     }
 
     // Add members (1 keypackage per device)
-    let (commit_msg, welcome_msg, _group_info) = new_group
+    let (commit_msg, welcome_msg, group_info) = new_group
         .add_members(provider, &signer, &key_packages)
         .map_err(|_| MlsError::AddMembers)?;
 
@@ -176,11 +187,63 @@ pub fn init_group(
     let welcome_bytes = welcome_msg
         .tls_serialize_detached()
         .map_err(|_| MlsError::WelcomeSerialize)?;
+    // Encode in base64
+    let welcome_b64 = base64::engine::general_purpose::STANDARD.encode(welcome_bytes);
 
     // Retrieve all the device_id that have been had to the group
     let device_ids: Vec<String> = response.iter().map(|dk| dk.device_id.clone()).collect();
 
-    // TODO: http::send_welcome(device_ids, welcome_bytes)?;
+    println!("Sending welcome to serveur...");
 
+    http::send_welcome(WelcomePayload {
+        device_ids,
+        welcome_b64,
+    })?;
+
+    Ok(())
+}
+
+pub fn fetch_welcome(provider: &MyProvider) -> Result<(), AppError> {
+    let response = http::fetch_welcome()?;
+
+    // List of the groups joined with the fetched welcome messages
+    let mut groups: Vec<MlsGroup> = Vec::new();
+
+    for item in response {
+        // Decode the welcomes
+        let welcome_bytes = base64::engine::general_purpose::STANDARD
+            .decode(item.welcome_b64)
+            .map_err(|_| MlsError::WelcomeDecode)?;
+
+        // Deserialize the welcomes
+        let mls_message_in = MlsMessageIn::tls_deserialize_exact_bytes(&welcome_bytes)
+            .map_err(|_| MlsError::WelcomeDeserialize)?;
+
+        // ... and inspect the message
+        let welcome = match mls_message_in.extract() {
+            MlsMessageBodyIn::Welcome(welcome) => welcome,
+            // We know it's a welcome message, so we ignore all other cases
+            _ => unreachable!("Unexpected message type."),
+        };
+
+        // Build a staged join for the group in order to inspect the welcome
+        let staged_join = StagedWelcome::new_from_welcome(
+            provider,
+            &MlsGroupJoinConfig::default(),
+            welcome,
+            // TODO: if ratchet_tree_extension is false, we have to provide the public ratchet tree here
+            None,
+        )
+        .map_err(|_| MlsError::StagedWelcomeCreate)?;
+
+        // Finally : join the group
+        let mut joined_group = staged_join
+            .into_group(provider)
+            .map_err(|_| MlsError::GroupJoin)?;
+        groups.push(joined_group);
+
+        // TODO : Stocker nous même le group_id dans une table créé par nos soins dans SQLite
+        // Ce group_id nous permet de rerecupérer les info mls du group pour send message...
+    }
     Ok(())
 }

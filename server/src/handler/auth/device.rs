@@ -6,6 +6,7 @@ use crate::handler::auth::{self, jwt};
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
+use base64::Engine;
 use openmls::prelude::{
     KeyPackageIn, ProtocolVersion,
     tls_codec::{DeserializeBytes, Serialize as TlsSerialize},
@@ -20,6 +21,17 @@ use uuid::Uuid;
 pub struct DeviceKeyPackage {
     pub device_id: Uuid,
     pub key_package: Vec<u8>,
+}
+
+#[derive(Deserialize)]
+pub struct StoreWelcomePayload {
+    pub device_ids: Vec<Uuid>,
+    pub welcome_b64: String,
+}
+
+#[derive(Serialize)]
+pub struct WelcomeResponse {
+    pub welcome_b64: String,
 }
 
 pub async fn create_device(
@@ -169,70 +181,73 @@ pub async fn get_keypackage_from_username(
     Ok((StatusCode::OK, Json(out)))
 }
 
-/* Old function, to delete
-
-pub async fn get_keypackage_from_username_old(
+pub async fn store_welcome(
     State(state): State<ServerState>,
-    Json(payload): Json<String>,
-) -> Result<(StatusCode, Json<Vec<DeviceKeyPackage>>), StatusCode> {
-    // Retrieve username and compute the corresponding login_lookup
-    let login_lookup = auth::login_lookup(&state.pepper(), &payload);
+    Json(payload): Json<StoreWelcomePayload>,
+) -> Result<StatusCode, StatusCode> {
+    println!("test1");
+    let welcome_bytes = base64::engine::general_purpose::STANDARD
+        .decode(payload.welcome_b64)
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Get the user from the login_lookup
-    let user = sqlx::query_as!(
-        User,
-        r#"
-        SELECT id, login_lookup, opaque_record, created_at, updated_at
-        FROM users
-        WHERE login_lookup = $1
-        "#,
-        login_lookup,
-    )
-    .fetch_optional(&state.pool())
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    println!("test2");
 
-    // Get all the devices of the user_id
-    let devices = sqlx::query_as!(
-        Device,
+    for device_id in payload.device_ids {
+        sqlx::query!(
+            r#"INSERT INTO welcomes (device_id, welcome) VALUES ($1, $2)"#,
+            device_id,
+            welcome_bytes,
+        )
+        .execute(&state.pool())
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+    println!("test3");
+
+    Ok(StatusCode::OK)
+}
+
+pub async fn fetch_welcome(
+    State(state): State<ServerState>,
+    Extension(claims_jwt): Extension<Claims>,
+) -> Result<(StatusCode, Json<Vec<WelcomeResponse>>), StatusCode> {
+    println!("test4");
+    // Retrieve the device_id from the JWT Session
+    let device_id = Uuid::parse_str(claims_jwt.sub()).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    // Grab all pending welcomes for this device
+    let rows = sqlx::query!(
         r#"
-        SELECT id, user_id, created_at, updated_at
-        FROM devices
-        WHERE user_id = $1
+        SELECT id, welcome
+        FROM welcomes
+        WHERE device_id = $1
+        ORDER BY created_at
         "#,
-        user.id
+        device_id
     )
     .fetch_all(&state.pool())
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Get one keypackage for all the device_id
-    let mut out = Vec::new();
-    for device in devices {
-        let kp = sqlx::query_as!(
-            KeyPackage,
-            r#"
-            SELECT id, device_id, key_package, created_at, updated_at
-            FROM key_packages
-            WHERE device_id = $1
-            ORDER BY created_at
-            LIMIT 1
-            "#,
-            device.id
-        )
-        .fetch_optional(&state.pool())
+    // If no welcome pending...
+    if rows.is_empty() {
+        return Ok((StatusCode::OK, Json(vec![])));
+    }
+
+    // One‑time messages: we delete right after reading
+    let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
+    sqlx::query!(r#"DELETE FROM welcomes WHERE id = ANY($1)"#, &ids)
+        .execute(&state.pool())
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        if let Some(kp) = kp {
-            out.push(DeviceKeyPackage {
-                device_id: device.id,
-                key_package: kp.key_package,
-            });
-        }
-    }
+    // Encode bytes to base64 for JSON response
+    let out = rows
+        .into_iter()
+        .map(|r| WelcomeResponse {
+            welcome_b64: base64::engine::general_purpose::STANDARD.encode(r.welcome),
+        })
+        .collect();
 
     Ok((StatusCode::OK, Json(out)))
 }
- */

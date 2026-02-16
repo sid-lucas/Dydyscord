@@ -19,8 +19,6 @@ async fn main() {
     let server_state = server::ServerState::new().await;
 
     let app = Router::new()
-        // Routes protected by an Access JWT:
-        // None
         // Routes protected by a Session JWT:
         .route(
             "/test/session",
@@ -45,6 +43,20 @@ async fn main() {
                 ),
             ),
         )
+        .route(
+            "/welcome",
+            post(handler::auth::device::store_welcome).layer(middleware::from_fn_with_state(
+                server_state.clone(),
+                handler::auth::jwt::verify_jwt_session,
+            )),
+        )
+        .route(
+        "/welcome",
+        get(handler::auth::device::fetch_welcome).layer(middleware::from_fn_with_state(
+            server_state.clone(),
+            handler::auth::jwt::verify_jwt_session,
+        )),
+    )
         // Routes protected by an Auth JWT:
         .route(
             "/device",

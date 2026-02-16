@@ -41,3 +41,17 @@ CREATE TABLE IF NOT EXISTS key_packages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS welcomes (
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    device_id UUID NOT NULL,
+    welcome BYTEA NOT NULL,
+    CONSTRAINT fk_welcomes_device
+        FOREIGN KEY (device_id)
+        REFERENCES devices(id)
+        ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_welcomes_device_id ON welcomes(device_id);
+

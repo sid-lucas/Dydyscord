@@ -39,8 +39,9 @@ fn handle_logged_out() -> Option<AppState> {
 
 fn handle_logged_in(session: Session) -> Option<AppState> {
     match choice::prompt_logged_in() {
-        choice::LoggedInChoice::CreateGroup => create_group(session),
         choice::LoggedInChoice::AddFriend => add_friend(session),
+        choice::LoggedInChoice::CreateGroup => create_group(session),
+        choice::LoggedInChoice::FetchWelcome => fetch_welcome(session),
         choice::LoggedInChoice::TestSession => test_session(session),
         choice::LoggedInChoice::Logout => {
             drop(session);
@@ -142,15 +143,31 @@ fn create_group(session: Session) -> Option<AppState> {
     };
 
     // TODO : Change use of "unwrap", even tho provider cannot be "None" here...
-    mls::identity::init_group(
+    match mls::identity::init_group(
         session.db_key().unwrap(),
         session.user_id(),
         session.device_id().unwrap(),
         session.provider().unwrap(),
         &username,
-    );
+    ) {
+        Ok(_) => (),
+        Err(e) => {
+            eprintln!("Could not initialize group : {e}");
+        }
+    }
 
     println!("Creating group and inviting: {username}");
+    Some(AppState::LoggedIn(session))
+}
+
+fn fetch_welcome(session: Session) -> Option<AppState> {
+    match mls::identity::fetch_welcome() {
+        Ok(_) => (),
+        Err(e) => {
+            eprintln!("Error fetching welcomes : {e}")
+        }
+    };
+
     Some(AppState::LoggedIn(session))
 }
 

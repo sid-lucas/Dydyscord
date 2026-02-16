@@ -26,6 +26,12 @@ pub enum MlsError {
     #[error("key package is invalid")]
     KeyPackageInvalid,
 
+    #[error("could not create a new group")]
+    GroupCreate,
+
+    #[error("could not join a group")]
+    GroupJoin,
+
     #[error("could not add member into group")]
     AddMembers,
 
@@ -34,4 +40,13 @@ pub enum MlsError {
 
     #[error("could not serialize welcome message")]
     WelcomeSerialize,
+
+    #[error("could not decode welcome message")]
+    WelcomeDecode,
+
+    #[error("could not deserialize MLS message")]
+    WelcomeDeserialize,
+
+    #[error("could not create staged join from welcome")]
+    StagedWelcomeCreate,
 }
