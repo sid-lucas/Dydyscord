@@ -1,5 +1,9 @@
 use OpaqueCipherSuite as Default;
 use base64::Engine;
+use common::{
+    OpaqueLoginFinishRequest, OpaqueLoginStartRequest, OpaqueRegisterFinishRequest,
+    OpaqueRegisterStartRequest,
+};
 
 use crate::error::AppError;
 use crate::transport::http;
@@ -13,46 +17,6 @@ use std::{thread, time::Duration};
 use uuid::Uuid;
 
 use crate::auth::error::AuthError;
-use serde::{Deserialize, Serialize};
-
-// Register
-
-#[derive(Serialize)]
-pub struct RegisterStartRequest<'a> {
-    pub username: &'a str,
-    pub start_register_request: String, // base64
-}
-
-#[derive(Deserialize)]
-pub struct RegisterStartResponse {
-    pub start_register_response: String, // base64
-}
-
-#[derive(Serialize)]
-pub struct RegisterFinishRequest<'a> {
-    pub username: &'a str,
-    pub finish_register_request: String, // base64
-}
-
-// Login
-
-#[derive(Serialize)]
-pub struct LoginStartRequest<'a> {
-    pub username: &'a str,
-    pub start_login_request: String, // base64
-}
-
-#[derive(Deserialize)]
-pub struct LoginStartResponse {
-    pub start_login_response: String, // base64
-    pub user_id: Uuid, // also used as key-value to retrieve server_login_state
-}
-
-#[derive(Serialize)]
-pub struct LoginFinishRequest {
-    pub finish_login_request: String, // base64
-    pub user_id: Uuid,                // key-value to retrieve server_login_state
-}
 
 struct OpaqueCipherSuite;
 
@@ -80,11 +44,11 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
     // API call (send request and receive response)
-    let response = http::opaque_register(RegisterStartRequest {
-        username: &username,
-        start_register_request,
+    let response = http::opaque_register(OpaqueRegisterStartRequest {
+        username: username.to_string(),
+        request_b64: start_register_request,
     })?;
-    let register_response_b64 = response.start_register_response;
+    let register_response_b64 = response.response_b64;
 
     // Response base64 -> bytes
     let register_response_bytes = base64::engine::general_purpose::STANDARD
@@ -110,9 +74,9 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
     // API call (send request and receive response)
-    http::opaque_register_finish(RegisterFinishRequest {
-        username: &username,
-        finish_register_request,
+    http::opaque_register_finish(OpaqueRegisterFinishRequest {
+        username: username.to_string(),
+        request_b64: finish_register_request,
     })?;
 
     Ok(())
@@ -132,11 +96,11 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     // TODO : fix timing attack
 
     // API call (send request and receive response)
-    let response = http::opaque_login(LoginStartRequest {
-        username: &username,
-        start_login_request,
+    let response = http::opaque_login(OpaqueLoginStartRequest {
+        username: username.to_string(),
+        request_b64: start_login_request,
     })?;
-    let (login_response_b64, id) = (response.start_login_response, response.user_id);
+    let (login_response_b64, id) = (response.response_b64, response.user_id);
 
     // Response base64 -> bytes
     let login_response_bytes = base64::engine::general_purpose::STANDARD
@@ -165,9 +129,9 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
     // API call (send request and receive response)
-    http::opaque_login_finish(LoginFinishRequest {
-        finish_login_request,
+    http::opaque_login_finish(OpaqueLoginFinishRequest {
         user_id: id,
+        request_b64: finish_login_request,
     })?;
 
     Ok(LoginResult {

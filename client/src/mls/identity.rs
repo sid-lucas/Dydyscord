@@ -5,7 +5,7 @@ use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
 use secrecy::SecretSlice;
-use serde::{Deserialize, Serialize};
+use common::WelcomeStoreRequest;
 
 use crate::config::constant;
 use crate::error::AppError;
@@ -15,23 +15,6 @@ use crate::storage;
 use crate::transport::http;
 
 // TODO Rename file, does not correspond to what it does
-
-#[derive(Deserialize, Debug)]
-pub struct DeviceKeyPackage {
-    pub device_id: String, // ou Uuid si tu veux
-    pub key_package: Vec<u8>,
-}
-
-#[derive(Serialize, Debug)]
-pub struct WelcomePayload {
-    pub device_ids: Vec<String>,
-    pub welcome_b64: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct WelcomeResponse {
-    pub welcome_b64: String,
-}
 
 // A helper to create and store credentials.
 fn generate_credential_with_key(
@@ -191,11 +174,11 @@ pub fn init_group(
     let welcome_b64 = base64::engine::general_purpose::STANDARD.encode(welcome_bytes);
 
     // Retrieve all the device_id that have been had to the group
-    let device_ids: Vec<String> = response.iter().map(|dk| dk.device_id.clone()).collect();
+    let device_ids = response.iter().map(|dk| dk.device_id).collect();
 
     println!("Sending welcome to serveur...");
 
-    http::send_welcome(WelcomePayload {
+    http::send_welcome(WelcomeStoreRequest {
         device_ids,
         welcome_b64,
     })?;

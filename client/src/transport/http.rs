@@ -1,8 +1,9 @@
-use crate::auth::opaque::{
-    LoginFinishRequest, LoginStartRequest, LoginStartResponse, RegisterFinishRequest,
-    RegisterStartRequest, RegisterStartResponse,
+use common::{
+    CreateDeviceResponse, DeviceKeyPackage, KeyPackagesUploadRequest, OpaqueLoginFinishRequest,
+    OpaqueLoginStartRequest, OpaqueLoginStartResponse, OpaqueRegisterFinishRequest,
+    OpaqueRegisterStartRequest, OpaqueRegisterStartResponse, UserKeyPackageRequest,
+    WelcomeFetchResponse, WelcomeStoreRequest,
 };
-use crate::mls::identity::{DeviceKeyPackage, WelcomePayload, WelcomeResponse};
 use crate::transport::error::TransportError;
 use once_cell::sync::Lazy;
 use reqwest::StatusCode;
@@ -13,8 +14,8 @@ const SERVER_URL: &str = "http://localhost:3000";
 static CLIENT: Lazy<Client> = Lazy::new(|| Client::builder().cookie_store(true).build().unwrap());
 
 pub fn opaque_register(
-    payload: RegisterStartRequest<'_>,
-) -> Result<RegisterStartResponse, TransportError> {
+    payload: OpaqueRegisterStartRequest,
+) -> Result<OpaqueRegisterStartResponse, TransportError> {
     let url = format!("{SERVER_URL}/register/start");
     let response = CLIENT
         .post(&url)
@@ -31,8 +32,8 @@ pub fn opaque_register(
 }
 
 pub fn opaque_register_finish(
-    payload: RegisterFinishRequest<'_>,
-) -> Result<String, TransportError> {
+    payload: OpaqueRegisterFinishRequest,
+) -> Result<(), TransportError> {
     let url = format!("{SERVER_URL}/register/finish");
     let response = CLIENT
         .post(&url)
@@ -41,15 +42,15 @@ pub fn opaque_register_finish(
         .map_err(|_| TransportError::Network)?;
 
     match response.status() {
-        StatusCode::OK => Ok(response
-            .text()
-            .map_err(|_| TransportError::InvalidResponse)?),
+        StatusCode::OK => Ok(()),
         StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
         _ => Err(TransportError::Server),
     }
 }
 
-pub fn opaque_login(payload: LoginStartRequest<'_>) -> Result<LoginStartResponse, TransportError> {
+pub fn opaque_login(
+    payload: OpaqueLoginStartRequest,
+) -> Result<OpaqueLoginStartResponse, TransportError> {
     let url = format!("{SERVER_URL}/login/start");
     let response = CLIENT
         .post(&url)
@@ -65,7 +66,7 @@ pub fn opaque_login(payload: LoginStartRequest<'_>) -> Result<LoginStartResponse
     }
 }
 
-pub fn opaque_login_finish(payload: LoginFinishRequest) -> Result<(), TransportError> {
+pub fn opaque_login_finish(payload: OpaqueLoginFinishRequest) -> Result<(), TransportError> {
     let url = format!("{SERVER_URL}/login/finish");
     let response = CLIENT
         .post(&url)
@@ -89,9 +90,12 @@ pub fn create_device() -> Result<String, TransportError> {
         .map_err(|_| TransportError::Network)?;
 
     match response.status() {
-        StatusCode::CREATED => Ok(response
-            .json::<String>()
-            .map_err(|_| TransportError::InvalidResponse)?),
+        StatusCode::CREATED => {
+            let body = response
+                .json::<CreateDeviceResponse>()
+                .map_err(|_| TransportError::InvalidResponse)?;
+            Ok(body.device_id.to_string())
+        }
         StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
         StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
         _ => Err(TransportError::Server),
@@ -120,7 +124,7 @@ pub fn send_key_packages(
     let url = format!("{SERVER_URL}/device/{device_id}/keypackages");
     let response = CLIENT
         .post(&url)
-        .json(&key_packages)
+        .json(&KeyPackagesUploadRequest { key_packages })
         .send()
         .map_err(|_| TransportError::Network)?;
 
@@ -136,7 +140,9 @@ pub fn create_group(user: &str) -> Result<Vec<DeviceKeyPackage>, TransportError>
     let url = format!("{SERVER_URL}/user/keypackage"); // TODO : change route name
     let response = CLIENT
         .post(&url)
-        .json(user)
+        .json(&UserKeyPackageRequest {
+            username: user.to_string(),
+        })
         .send()
         .map_err(|_| TransportError::Network)?;
 
@@ -148,7 +154,7 @@ pub fn create_group(user: &str) -> Result<Vec<DeviceKeyPackage>, TransportError>
     }
 }
 
-pub fn send_welcome(payload: WelcomePayload) -> Result<(), TransportError> {
+pub fn send_welcome(payload: WelcomeStoreRequest) -> Result<(), TransportError> {
     let url = format!("{SERVER_URL}/welcome");
     let response = CLIENT
         .post(&url)
@@ -164,7 +170,7 @@ pub fn send_welcome(payload: WelcomePayload) -> Result<(), TransportError> {
     }
 }
 
-pub fn fetch_welcome() -> Result<Vec<WelcomeResponse>, TransportError> {
+pub fn fetch_welcome() -> Result<Vec<WelcomeFetchResponse>, TransportError> {
     let url = format!("{SERVER_URL}/welcome");
     let response = CLIENT
         .get(&url)

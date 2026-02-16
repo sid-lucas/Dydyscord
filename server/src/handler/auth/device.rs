@@ -1,12 +1,16 @@
 use crate::config::constant;
 use crate::config::server::ServerState;
-use crate::database::model::{Device, KeyPackage, User};
+use crate::database::model::Device;
 use crate::handler::auth::jwt::Claims;
 use crate::handler::auth::{self, jwt};
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
 use base64::Engine;
+use common::{
+    CreateDeviceResponse, DeviceKeyPackage, KeyPackagesUploadRequest, UserKeyPackageRequest,
+    WelcomeFetchResponse, WelcomeStoreRequest,
+};
 use openmls::prelude::{
     KeyPackageIn, ProtocolVersion,
     tls_codec::{DeserializeBytes, Serialize as TlsSerialize},
@@ -14,30 +18,12 @@ use openmls::prelude::{
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
 use redis::AsyncCommands;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
-#[derive(Serialize)]
-pub struct DeviceKeyPackage {
-    pub device_id: Uuid,
-    pub key_package: Vec<u8>,
-}
-
-#[derive(Deserialize)]
-pub struct StoreWelcomePayload {
-    pub device_ids: Vec<Uuid>,
-    pub welcome_b64: String,
-}
-
-#[derive(Serialize)]
-pub struct WelcomeResponse {
-    pub welcome_b64: String,
-}
 
 pub async fn create_device(
     State(state): State<ServerState>,
     Extension(claims_jwt): Extension<Claims>,
-) -> Result<(StatusCode, CookieJar, Json<Uuid>), StatusCode> {
+) -> Result<(StatusCode, CookieJar, Json<CreateDeviceResponse>), StatusCode> {
     let user_id = Uuid::parse_str(claims_jwt.sub()).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     let device = sqlx::query_as!(
@@ -66,7 +52,13 @@ pub async fn create_device(
 
     let jar = CookieJar::new().add(cookie);
 
-    Ok((StatusCode::CREATED, jar, Json(device.id)))
+    Ok((
+        StatusCode::CREATED,
+        jar,
+        Json(CreateDeviceResponse {
+            device_id: device.id,
+        }),
+    ))
 }
 
 pub async fn get_device(
@@ -107,11 +99,11 @@ pub async fn get_device(
 pub async fn update_key_packages(
     State(state): State<ServerState>,
     Extension(claims_jwt): Extension<Claims>,
-    Json(payload): Json<Vec<Vec<u8>>>,
+    Json(payload): Json<KeyPackagesUploadRequest>,
 ) -> Result<StatusCode, StatusCode> {
     let device_id = Uuid::parse_str(claims_jwt.sub()).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    for kp_bytes in payload {
+    for kp_bytes in payload.key_packages {
         // Validation of the key_package received (in a scope, so provider drop before the .await)
         {
             let provider = OpenMlsRustCrypto::default();
@@ -138,10 +130,10 @@ pub async fn update_key_packages(
 
 pub async fn get_keypackage_from_username(
     State(state): State<ServerState>,
-    Json(payload): Json<String>,
+    Json(payload): Json<UserKeyPackageRequest>,
 ) -> Result<(StatusCode, Json<Vec<DeviceKeyPackage>>), StatusCode> {
     // Retrieve username and compute the corresponding login_lookup
-    let login_lookup = auth::login_lookup(&state.pepper(), &payload);
+    let login_lookup = auth::login_lookup(&state.pepper(), &payload.username);
 
     // Atomically selects and deletes the oldest key_package per device for the given user, returning the consumed key packages.
     // Ensures one-time consumption and avoids race conditions.
@@ -183,7 +175,7 @@ pub async fn get_keypackage_from_username(
 
 pub async fn store_welcome(
     State(state): State<ServerState>,
-    Json(payload): Json<StoreWelcomePayload>,
+    Json(payload): Json<WelcomeStoreRequest>,
 ) -> Result<StatusCode, StatusCode> {
     let welcome_bytes = base64::engine::general_purpose::STANDARD
         .decode(payload.welcome_b64)
@@ -206,7 +198,7 @@ pub async fn store_welcome(
 pub async fn fetch_welcome(
     State(state): State<ServerState>,
     Extension(claims_jwt): Extension<Claims>,
-) -> Result<(StatusCode, Json<Vec<WelcomeResponse>>), StatusCode> {
+) -> Result<(StatusCode, Json<Vec<WelcomeFetchResponse>>), StatusCode> {
     // Retrieve the device_id from the JWT Session
     let device_id = Uuid::parse_str(claims_jwt.sub()).map_err(|_| StatusCode::BAD_REQUEST)?;
 
@@ -239,7 +231,7 @@ pub async fn fetch_welcome(
     // Encode bytes to base64 for JSON response
     let out = rows
         .into_iter()
-        .map(|r| WelcomeResponse {
+        .map(|r| WelcomeFetchResponse {
             welcome_b64: base64::engine::general_purpose::STANDARD.encode(r.welcome),
         })
         .collect();

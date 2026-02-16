@@ -1,11 +1,12 @@
 use DefaultCipherSuite as DCS;
 use base64::Engine;
+use common::{
+    OpaqueLoginFinishRequest, OpaqueLoginStartRequest, OpaqueLoginStartResponse,
+    OpaqueRegisterFinishRequest, OpaqueRegisterStartRequest, OpaqueRegisterStartResponse,
+};
 use opaque_ke::CipherSuite;
 use opaque_ke::argon2::Argon2;
 use rand::rngs::OsRng;
-
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::auth::{self, jwt};
 use crate::config::server::ServerState;
@@ -22,45 +23,6 @@ use redis::AsyncCommands;
 
 use crate::database::model::User;
 
-// Register
-
-#[derive(Deserialize, Debug)]
-pub struct RegisterStartRequest {
-    pub username: String,
-    pub start_register_request: String, // base64
-}
-
-#[derive(Serialize)]
-pub struct RegisterStartResponse {
-    pub start_register_response: String, // base64
-}
-
-#[derive(Deserialize)]
-pub struct RegisterFinishRequest {
-    pub username: String,
-    pub finish_register_request: String, // base64
-}
-
-// Login
-
-#[derive(Deserialize)]
-pub struct LoginStartRequest {
-    pub username: String,
-    pub start_login_request: String, // base64
-}
-
-#[derive(Serialize)]
-pub struct LoginStartResponse {
-    pub start_login_response: String, // base64
-    pub user_id: Uuid,                // also used as key-value to retrieve server_login_state
-}
-
-#[derive(Deserialize)]
-pub struct LoginFinishRequest {
-    pub finish_login_request: String, // base64
-    pub user_id: String,              // key-value to retrieve server_login_state
-}
-
 pub struct DefaultCipherSuite;
 
 impl CipherSuite for DefaultCipherSuite {
@@ -71,11 +33,11 @@ impl CipherSuite for DefaultCipherSuite {
 
 pub async fn register_start(
     State(state): State<ServerState>,
-    Json(payload): Json<RegisterStartRequest>,
-) -> Result<(StatusCode, Json<RegisterStartResponse>), StatusCode> {
+    Json(payload): Json<OpaqueRegisterStartRequest>,
+) -> Result<(StatusCode, Json<OpaqueRegisterStartResponse>), StatusCode> {
     // Retrieve start_register_request from the client and decode/deserialize it
     let decoded_request = base64::engine::general_purpose::STANDARD
-        .decode(&payload.start_register_request)
+        .decode(&payload.request_b64)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let start_register_request = RegistrationRequest::<DCS>::deserialize(&decoded_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -117,8 +79,8 @@ pub async fn register_start(
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
     // Create and send the response
-    let response = RegisterStartResponse {
-        start_register_response,
+    let response = OpaqueRegisterStartResponse {
+        response_b64: start_register_response,
     };
 
     Ok((StatusCode::CREATED, Json(response)))
@@ -126,11 +88,11 @@ pub async fn register_start(
 
 pub async fn register_finish(
     State(state): State<ServerState>,
-    Json(payload): Json<RegisterFinishRequest>,
+    Json(payload): Json<OpaqueRegisterFinishRequest>,
 ) -> Result<StatusCode, StatusCode> {
     // Retrieve finish_register_request from the client and decode/deserialize it
     let decoded_request = base64::engine::general_purpose::STANDARD
-        .decode(&payload.finish_register_request)
+        .decode(&payload.request_b64)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let finish_register_request = RegistrationUpload::<DCS>::deserialize(&decoded_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -160,12 +122,12 @@ pub async fn register_finish(
 
 pub async fn login_start(
     State(mut state): State<ServerState>,
-    Json(payload): Json<LoginStartRequest>,
-) -> Result<(StatusCode, Json<LoginStartResponse>), StatusCode> {
+    Json(payload): Json<OpaqueLoginStartRequest>,
+) -> Result<(StatusCode, Json<OpaqueLoginStartResponse>), StatusCode> {
     // Retrieve start_login_request from the client and decode/deserialize it
     let start_login_request = CredentialRequest::<DCS>::deserialize(
         &base64::engine::general_purpose::STANDARD
-            .decode(&payload.start_login_request)
+            .decode(&payload.request_b64)
             .map_err(|_| StatusCode::BAD_REQUEST)?,
     )
     .map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -227,8 +189,8 @@ pub async fn login_start(
 
     Ok((
         StatusCode::OK,
-        Json(LoginStartResponse {
-            start_login_response,
+        Json(OpaqueLoginStartResponse {
+            response_b64: start_login_response,
             user_id,
         }),
     ))
@@ -236,7 +198,7 @@ pub async fn login_start(
 
 pub async fn login_finish(
     State(state): State<ServerState>,
-    Json(payload): Json<LoginFinishRequest>,
+    Json(payload): Json<OpaqueLoginFinishRequest>,
 ) -> Result<(StatusCode, CookieJar), StatusCode> {
     // Create the key with user_id
     let redis_key = format!("opaque:login:{}", payload.user_id);
@@ -263,7 +225,7 @@ pub async fn login_finish(
 
     // Decode/Deserialize the client's final message
     let finish_login_request = base64::engine::general_purpose::STANDARD
-        .decode(&payload.finish_login_request)
+        .decode(&payload.request_b64)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let finish_login_request = CredentialFinalization::<DCS>::deserialize(&finish_login_request)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
