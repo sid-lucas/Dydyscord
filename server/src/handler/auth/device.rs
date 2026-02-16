@@ -185,12 +185,9 @@ pub async fn store_welcome(
     State(state): State<ServerState>,
     Json(payload): Json<StoreWelcomePayload>,
 ) -> Result<StatusCode, StatusCode> {
-    println!("test1");
     let welcome_bytes = base64::engine::general_purpose::STANDARD
         .decode(payload.welcome_b64)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
-
-    println!("test2");
 
     for device_id in payload.device_ids {
         sqlx::query!(
@@ -202,7 +199,6 @@ pub async fn store_welcome(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
-    println!("test3");
 
     Ok(StatusCode::OK)
 }
@@ -211,7 +207,6 @@ pub async fn fetch_welcome(
     State(state): State<ServerState>,
     Extension(claims_jwt): Extension<Claims>,
 ) -> Result<(StatusCode, Json<Vec<WelcomeResponse>>), StatusCode> {
-    println!("test4");
     // Retrieve the device_id from the JWT Session
     let device_id = Uuid::parse_str(claims_jwt.sub()).map_err(|_| StatusCode::BAD_REQUEST)?;
 
