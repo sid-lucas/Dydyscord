@@ -1,7 +1,7 @@
 use base64::Engine;
 use common::{KeyPackagesUploadRequest, UserKeyPackageRequest, WelcomeStoreRequest};
-use openmls::prelude::*;
 use openmls::prelude::tls_codec::Serialize as TlsSerialize;
+use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
@@ -19,7 +19,6 @@ use crate::transport::http;
 // A helper to create and store credentials.
 fn generate_credential_with_key(
     identity: &str,
-    _provider: &MyProvider,
 ) -> Result<(CredentialWithKey, SignatureKeyPair), AppError> {
     // Create the credential with the identity (device_id)
     let identity = identity.as_bytes().to_vec();
@@ -88,8 +87,7 @@ pub fn init_openmls(
 
     if is_new_device {
         // Create the credential and signature keys
-        let (credential_with_key, signature_keys) =
-            generate_credential_with_key(&device_id, provider)?;
+        let (credential_with_key, signature_keys) = generate_credential_with_key(&device_id)?;
 
         // Store the private_key in the account-associated db, so OpenMLS has access to it
         signature_keys
@@ -111,7 +109,12 @@ pub fn init_openmls(
             kp_bytes.push(bytes);
         }
         // serialize the key packages and send them to the server to be stored in the db
-        http::send_key_packages(device_id, KeyPackagesUploadRequest { key_packages: kp_bytes })?;
+        http::send_key_packages(
+            device_id,
+            KeyPackagesUploadRequest {
+                key_packages: kp_bytes,
+            },
+        )?;
     }
 
     Ok(())
@@ -159,7 +162,7 @@ pub fn init_group(
     }
 
     // Add members (1 keypackage per device)
-    let (_commit_msg, welcome_msg, _group_info) = new_group
+    let (commit_msg, welcome_msg, group_info) = new_group
         .add_members(provider, &signer, &key_packages)
         .map_err(|_| MlsError::AddMembers)?;
 

@@ -14,7 +14,7 @@ pub struct Session {
     user_id: String,
     device_id: Option<String>,
     export_key: SecretSlice<u8>,
-    _session_key: SecretSlice<u8>,
+    session_key: SecretSlice<u8>,
     db_key: Option<SecretSlice<u8>>,
     provider: Option<MyProvider>,
 }
@@ -25,7 +25,7 @@ impl Session {
             user_id: login.id.to_string(),
             device_id: None,
             export_key: login.export_key.into(),
-            _session_key: login.session_key.into(),
+            session_key: login.session_key.into(),
             db_key: None,
             provider: None,
         }
@@ -61,8 +61,8 @@ impl Session {
         &self.export_key
     }
 
-    pub fn _session_key(&self) -> &SecretSlice<u8> {
-        &self._session_key
+    pub fn session_key(&self) -> &SecretSlice<u8> {
+        &self.session_key
     }
 
     pub fn db_key(&self) -> Option<&SecretSlice<u8>> {

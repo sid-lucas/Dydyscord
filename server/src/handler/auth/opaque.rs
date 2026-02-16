@@ -15,11 +15,11 @@ use opaque_ke::{
 use rand::rngs::OsRng;
 use redis::AsyncCommands;
 
-use crate::handler::jwt;
 use crate::config::server::ServerState;
 use crate::constant;
 use crate::database::model::User;
 use crate::handler;
+use crate::handler::jwt;
 
 pub struct DefaultCipherSuite;
 
@@ -237,7 +237,7 @@ pub async fn login_finish(
         .map_err(|_| StatusCode::UNAUTHORIZED)?; // wrong password or invalid proof
 
     // Shared secret between client and server
-    let _session_key = finish.session_key;
+    let session_key = finish.session_key;
 
     // Create the intermediate JWT (auth)
     let id = payload.user_id.to_string();

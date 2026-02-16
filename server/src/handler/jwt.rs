@@ -64,23 +64,23 @@ impl Claims {
         &self.sub
     }
 
-    pub fn _typ(&self) -> &TokenType {
+    pub fn typ(&self) -> &TokenType {
         &self.typ
     }
 
-    pub fn _aud(&self) -> &str {
+    pub fn aud(&self) -> &str {
         &self.aud
     }
 
-    pub fn _exp(&self) -> usize {
+    pub fn exp(&self) -> usize {
         self.exp
     }
 
-    pub fn _iat(&self) -> usize {
+    pub fn iat(&self) -> usize {
         self.iat
     }
 
-    pub fn _jti(&self) -> &Uuid {
+    pub fn jti(&self) -> &Uuid {
         &self.jti
     }
 }
