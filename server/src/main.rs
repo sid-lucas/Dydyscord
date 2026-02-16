@@ -31,7 +31,7 @@ async fn main() {
         )
         // TODO : Mettre dans session??
         .route(
-            "/device/:id/keypackages",
+            "/device/{id}/keypackages",
             post(handler::auth::device::update_key_packages).layer(middleware::from_fn_with_state(
                 server_state.clone(),
                 handler::auth::jwt::verify_jwt_session,

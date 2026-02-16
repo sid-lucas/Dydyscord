@@ -5,9 +5,13 @@ use crate::handler::auth::jwt;
 use crate::handler::auth::jwt::Claims;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
-use openmls::prelude::KeyPackageBundle;
+use openmls::prelude::{
+    KeyPackageIn, ProtocolVersion,
+    tls_codec::{DeserializeBytes, Serialize as TlsSerialize},
+};
+use openmls_rust_crypto::OpenMlsRustCrypto;
+use openmls_traits::OpenMlsProvider;
 use redis::AsyncCommands;
-use rkyv::{Archive, Deserialize, Serialize, deserialize, rancor::Error};
 use uuid::Uuid;
 
 pub async fn create_device(
@@ -82,19 +86,27 @@ pub async fn get_device(
 
 pub async fn update_key_packages(
     State(state): State<ServerState>,
-    Json(payload): Json<Vec<KeyPackageBundle>>,
     Extension(claims_jwt): Extension<Claims>,
+    Json(payload): Json<Vec<Vec<u8>>>,
 ) -> Result<StatusCode, StatusCode> {
     let device_id = Uuid::parse_str(claims_jwt.sub()).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    for key_package in payload {
-        // Serialize the KeyPackageBundle using rkyv
-        let key_package_bytes =
-            rkyv::to_bytes::<Error>(&key_package).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?; // TODO : Make it work with rkyv
+    for kp_bytes in payload {
+        // Validation of the key_package received (in a scope, so provider drop before the .await)
+        {
+            let provider = OpenMlsRustCrypto::default();
+            let kp_in = KeyPackageIn::tls_deserialize_exact_bytes(&kp_bytes)
+                .map_err(|_| StatusCode::BAD_REQUEST)?;
+            kp_in
+                .validate(provider.crypto(), ProtocolVersion::Mls10) // TODO : Maybe put version in a const
+                .map_err(|_| StatusCode::BAD_REQUEST)?;
+        }
+
+        // Store only the public KeyPackage bytes (TLS-serialized).
         sqlx::query!(
             r#"INSERT INTO key_packages (device_id, key_package) VALUES ($1, $2)"#,
             device_id,
-            key_package_bytes
+            kp_bytes
         )
         .execute(&state.pool())
         .await

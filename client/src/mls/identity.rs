@@ -1,7 +1,7 @@
+use openmls::prelude::tls_codec::Serialize;
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_traits::OpenMlsProvider;
-use serde::Serialize;
 
 use crate::config::constant;
 use crate::error::AppError;
@@ -62,14 +62,18 @@ pub fn init_openmls(is_new_device: bool, device_id: String) -> Result<(), AppErr
         // Create the credential and signature keys
         let (credential_with_key, signature_keys) = generate_credential_with_key(&device_id)?;
 
-        // Create 100 key package bundles
-        let mut key_packages = Vec::new();
+        // Create 100 key package
+        let mut kp_bytes = Vec::with_capacity(100);
         for _ in 0..100 {
-            let key_package = generate_key_package(&signature_keys, credential_with_key.clone())?;
-            key_packages.push(key_package);
+            let kp_bundle = generate_key_package(&signature_keys, credential_with_key.clone())?;
+            let bytes = kp_bundle
+                .key_package()
+                .tls_serialize_detached()
+                .map_err(|_| MlsError::KeyPackageCreate)?;
+            kp_bytes.push(bytes);
         }
         // serialize the key packages and send them to the server to be stored in the db
-        http::send_key_packages(device_id, key_packages)?;
+        http::send_key_packages(device_id, kp_bytes)?;
     }
 
     Ok(())

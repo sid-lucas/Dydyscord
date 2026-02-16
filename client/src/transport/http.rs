@@ -115,7 +115,7 @@ pub fn get_device() -> Result<(), TransportError> {
 
 pub fn send_key_packages(
     device_id: String,
-    key_packages: Vec<KeyPackageBundle>,
+    key_packages: Vec<Vec<u8>>,
 ) -> Result<(), TransportError> {
     let url = format!("{SERVER_URL}/device/{device_id}/keypackages");
     let response = CLIENT

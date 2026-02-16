@@ -31,8 +31,8 @@ impl Session {
     }
 
     // Setter
-    pub fn set_device_id(&mut self, id: String) {
-        self.device_id = Some(id);
+    pub fn set_device_id(&mut self, id: &str) {
+        self.device_id = Some(id.to_string());
     }
 
     pub fn set_db_key(&mut self, db_key: SecretSlice<u8>) {

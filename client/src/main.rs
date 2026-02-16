@@ -100,7 +100,7 @@ fn login() -> Option<AppState> {
         };
 
     // Add device/storage initialization information to the session
-    session.set_device_id(device_id);
+    session.set_device_id(&device_id);
     session.set_db_key(db_key);
 
     // Open the db connection and prepare the OpenMLS provider
