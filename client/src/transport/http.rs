@@ -90,7 +90,7 @@ pub fn create_device() -> Result<String, TransportError> {
 
     match response.status() {
         StatusCode::CREATED => Ok(response
-            .text()
+            .json::<String>()
             .map_err(|_| TransportError::InvalidResponse)?),
         StatusCode::BAD_REQUEST => Err(TransportError::BadRequest),
         StatusCode::UNAUTHORIZED => Err(TransportError::Unauthorized),
@@ -135,7 +135,7 @@ pub fn send_key_packages(
 pub fn create_group(user: &str) -> Result<Vec<DeviceKeyPackage>, TransportError> {
     let url = format!("{SERVER_URL}/user/keypackage"); // TODO : change route name
     let response = CLIENT
-        .get(&url)
+        .post(&url)
         .json(user)
         .send()
         .map_err(|_| TransportError::Network)?;

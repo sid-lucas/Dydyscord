@@ -36,7 +36,7 @@ async fn main() {
         )
         .route(
             "/user/keypackage", // TODO : Change route name?
-            get(handler::auth::device::get_keypackage_from_username).layer(
+            post(handler::auth::device::get_keypackage_from_username).layer(
                 middleware::from_fn_with_state(
                     server_state.clone(),
                     handler::auth::jwt::verify_jwt_session,

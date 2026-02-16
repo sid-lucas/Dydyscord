@@ -161,7 +161,8 @@ fn create_group(session: Session) -> Option<AppState> {
 }
 
 fn fetch_welcome(session: Session) -> Option<AppState> {
-    match mls::identity::fetch_welcome() {
+    // TODO : Change use of "unwrap", even tho provider cannot be "None" here...
+    match mls::identity::fetch_welcome(session.provider().unwrap()) {
         Ok(_) => (),
         Err(e) => {
             eprintln!("Error fetching welcomes : {e}")
