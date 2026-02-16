@@ -1,7 +1,8 @@
+use secrecy::{ExposeSecret, SecretSlice};
+
+use crate::error::AppError;
 use super::crypto;
 use super::error::StorageError;
-use crate::error::AppError;
-use secrecy::{ExposeSecret, SecretSlice};
 
 // Helper
 fn secret(bytes: &[u8]) -> SecretSlice<u8> {

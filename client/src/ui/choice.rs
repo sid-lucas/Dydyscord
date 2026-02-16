@@ -1,5 +1,6 @@
-use inquire_derive::Selectable;
 use std::fmt;
+
+use inquire_derive::Selectable;
 
 #[derive(Debug, Copy, Clone, Selectable)]
 pub enum LoggedOutChoice {

@@ -4,10 +4,11 @@ use common::{
     OpaqueRegisterStartRequest, OpaqueRegisterStartResponse, UserKeyPackageRequest,
     WelcomeFetchResponse, WelcomeStoreRequest,
 };
-use crate::transport::error::TransportError;
 use once_cell::sync::Lazy;
-use reqwest::StatusCode;
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
+
+use crate::transport::error::TransportError;
 
 const SERVER_URL: &str = "http://localhost:3000";
 
@@ -31,9 +32,7 @@ pub fn opaque_register(
     }
 }
 
-pub fn opaque_register_finish(
-    payload: OpaqueRegisterFinishRequest,
-) -> Result<(), TransportError> {
+pub fn opaque_register_finish(payload: OpaqueRegisterFinishRequest) -> Result<(), TransportError> {
     let url = format!("{SERVER_URL}/register/finish");
     let response = CLIENT
         .post(&url)

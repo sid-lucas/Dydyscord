@@ -1,9 +1,10 @@
+use std::os::unix::fs::PermissionsExt;
+use std::{env, fs, path::PathBuf};
+
 use base64::Engine;
 use openmls_sqlite_storage::Connection;
 use rusqlite::{OptionalExtension, params};
 use secrecy::{ExposeSecret, SecretSlice};
-use std::os::unix::fs::PermissionsExt;
-use std::{env, fs, path::PathBuf};
 
 use crate::config::constant;
 use crate::error::AppError;

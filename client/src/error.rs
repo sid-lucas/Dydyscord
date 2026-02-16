@@ -1,9 +1,11 @@
+use std::fmt;
+
+use thiserror::Error;
+
 use crate::{
     auth::error::AuthError, mls::error::MlsError, storage::error::StorageError,
     transport::error::TransportError, ui::error::UiError,
 };
-use std::fmt;
-use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AppError {

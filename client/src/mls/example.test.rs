@@ -1,4 +1,5 @@
 use base64::Engine;
+use once_cell::sync::OnceCell;
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::RustCrypto;
@@ -8,8 +9,6 @@ use openmls_traits::storage::StorageProvider;
 
 use crate::mls::storage::CBORCodec;
 use crate::mls::{MyProvider, crypto, storage};
-
-use once_cell::sync::OnceCell;
 
 // OnceCell because it allows defining a global value initialized once and readable everywhere
 // static mut: would not be safe / risk of race condition

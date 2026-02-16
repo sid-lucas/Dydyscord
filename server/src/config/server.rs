@@ -1,13 +1,13 @@
+use std::sync::Arc;
+
 use base64::Engine;
 use dotenv::dotenv;
 use opaque_ke::ServerSetup;
-use redis::Client as RedisClient;
 use redis::aio::ConnectionManager;
+use redis::Client as RedisClient;
+use secrecy::SecretSlice;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
-use std::sync::Arc;
-
-use secrecy::SecretSlice;
 
 use crate::config::constant;
 use crate::handler::auth::opaque::DefaultCipherSuite as OpaqueCiphersuite;

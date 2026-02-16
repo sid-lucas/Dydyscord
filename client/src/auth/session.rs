@@ -1,8 +1,9 @@
+use secrecy::SecretSlice;
+
 use crate::auth::error::AuthError;
 use crate::auth::opaque::LoginResult;
 use crate::error::AppError;
 use crate::mls::provider::{self, MyProvider};
-use secrecy::SecretSlice;
 
 pub enum AppState {
     LoggedOut,

@@ -1,10 +1,11 @@
-use crate::error::AppError;
-use crate::storage::error::StorageError;
 use aes_gcm::{
     Aes256Gcm, Nonce,
     aead::{Aead, AeadCore, KeyInit, OsRng},
 };
 use secrecy::{ExposeSecret, SecretSlice};
+
+use crate::error::AppError;
+use crate::storage::error::StorageError;
 
 pub fn generate_wrapped_db_key(
     export_key: &SecretSlice<u8>,
@@ -56,8 +57,8 @@ pub fn encrypt_db_key(
     let nonce = Aes256Gcm::generate_nonce(&mut rng);
 
     // Encrypt db_key with wrap_key
-    let cipher = Aes256Gcm::new_from_slice(wrap_key.expose_secret())
-        .map_err(|_| StorageError::Encrypt)?;
+    let cipher =
+        Aes256Gcm::new_from_slice(wrap_key.expose_secret()).map_err(|_| StorageError::Encrypt)?;
     let ciphertext = cipher
         .encrypt(&nonce, db_key.expose_secret())
         .map_err(|_| StorageError::Encrypt)?;
@@ -91,8 +92,8 @@ pub fn decrypt_db_key(
     let ciphertext = &wrapped[13..];
 
     // Decrypt db_key with wrap_key
-    let cipher = Aes256Gcm::new_from_slice(wrap_key.expose_secret())
-        .map_err(|_| StorageError::Decrypt)?;
+    let cipher =
+        Aes256Gcm::new_from_slice(wrap_key.expose_secret()).map_err(|_| StorageError::Decrypt)?;
     let db_key_vec = cipher
         .decrypt(nonce, ciphertext)
         .map_err(|_| StorageError::Decrypt)?;

@@ -1,5 +1,6 @@
-use crate::ui::error::UiError;
 use inquire::{Password, Text};
+
+use crate::ui::error::UiError;
 
 pub fn signup() -> Result<(String, String), UiError> {
     let username = Text::new("Enter your username:")

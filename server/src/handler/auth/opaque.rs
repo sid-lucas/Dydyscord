@@ -1,26 +1,23 @@
-use DefaultCipherSuite as DCS;
+use axum::{Json, extract::State, http::StatusCode};
+use axum_extra::extract::cookie::CookieJar;
 use base64::Engine;
 use common::{
     OpaqueLoginFinishRequest, OpaqueLoginStartRequest, OpaqueLoginStartResponse,
     OpaqueRegisterFinishRequest, OpaqueRegisterStartRequest, OpaqueRegisterStartResponse,
 };
-use opaque_ke::CipherSuite;
+use DefaultCipherSuite as DCS;
 use opaque_ke::argon2::Argon2;
-use rand::rngs::OsRng;
-
-use crate::auth::{self, jwt};
-use crate::config::server::ServerState;
-use crate::constant;
-
-use axum::{Json, extract::State, http::StatusCode};
-use axum_extra::extract::cookie::CookieJar;
-
+use opaque_ke::CipherSuite;
 use opaque_ke::{
     CredentialFinalization, CredentialRequest, RegistrationRequest, RegistrationUpload,
     ServerLogin, ServerLoginParameters, ServerRegistration,
 };
+use rand::rngs::OsRng;
 use redis::AsyncCommands;
 
+use crate::auth::{self, jwt};
+use crate::config::server::ServerState;
+use crate::constant;
 use crate::database::model::User;
 
 pub struct DefaultCipherSuite;
@@ -121,7 +118,7 @@ pub async fn register_finish(
 }
 
 pub async fn login_start(
-    State(mut state): State<ServerState>,
+    State(state): State<ServerState>,
     Json(payload): Json<OpaqueLoginStartRequest>,
 ) -> Result<(StatusCode, Json<OpaqueLoginStartResponse>), StatusCode> {
     // Retrieve start_login_request from the client and decode/deserialize it

@@ -1,11 +1,11 @@
 use base64::Engine;
-use openmls::prelude::tls_codec::Serialize as TlsSerialize;
+use common::WelcomeStoreRequest;
 use openmls::prelude::*;
+use openmls::prelude::tls_codec::Serialize as TlsSerialize;
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
 use secrecy::SecretSlice;
-use common::WelcomeStoreRequest;
 
 use crate::config::constant;
 use crate::error::AppError;
@@ -19,7 +19,7 @@ use crate::transport::http;
 // A helper to create and store credentials.
 fn generate_credential_with_key(
     identity: &str,
-    provider: &MyProvider,
+    _provider: &MyProvider,
 ) -> Result<(CredentialWithKey, SignatureKeyPair), AppError> {
     // Create the credential with the identity (device_id)
     let identity = identity.as_bytes().to_vec();
@@ -157,7 +157,7 @@ pub fn init_group(
     }
 
     // Add members (1 keypackage per device)
-    let (commit_msg, welcome_msg, group_info) = new_group
+    let (_commit_msg, welcome_msg, _group_info) = new_group
         .add_members(provider, &signer, &key_packages)
         .map_err(|_| MlsError::AddMembers)?;
 
@@ -220,7 +220,7 @@ pub fn fetch_welcome(provider: &MyProvider) -> Result<(), AppError> {
         .map_err(|_| MlsError::StagedWelcomeCreate)?;
 
         // Finally : join the group
-        let mut joined_group = staged_join
+        let joined_group = staged_join
             .into_group(provider)
             .map_err(|_| MlsError::GroupJoin)?;
         groups.push(joined_group);

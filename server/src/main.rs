@@ -1,11 +1,11 @@
-use crate::config::server::{self};
 use axum::{
     Router, middleware,
     routing::{get, post},
 };
 use config::constant;
 use handler::auth;
-use std::sync::Arc;
+
+use crate::config::server::{self};
 
 mod config;
 mod database;
@@ -51,12 +51,12 @@ async fn main() {
             )),
         )
         .route(
-        "/welcome",
-        get(handler::auth::device::fetch_welcome).layer(middleware::from_fn_with_state(
-            server_state.clone(),
-            handler::auth::jwt::verify_jwt_session,
-        )),
-    )
+            "/welcome",
+            get(handler::auth::device::fetch_welcome).layer(middleware::from_fn_with_state(
+                server_state.clone(),
+                handler::auth::jwt::verify_jwt_session,
+            )),
+        )
         // Routes protected by an Auth JWT:
         .route(
             "/device",

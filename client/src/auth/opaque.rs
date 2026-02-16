@@ -1,22 +1,20 @@
-use OpaqueCipherSuite as Default;
 use base64::Engine;
 use common::{
     OpaqueLoginFinishRequest, OpaqueLoginStartRequest, OpaqueRegisterFinishRequest,
     OpaqueRegisterStartRequest,
 };
-
-use crate::error::AppError;
-use crate::transport::http;
 use opaque_ke::argon2::Argon2;
 use opaque_ke::{
     CipherSuite, ClientLogin, ClientLoginFinishParameters, ClientRegistration,
     ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
 };
+use OpaqueCipherSuite as Default;
 use rand::rngs::OsRng;
-use std::{thread, time::Duration};
 use uuid::Uuid;
 
 use crate::auth::error::AuthError;
+use crate::error::AppError;
+use crate::transport::http;
 
 struct OpaqueCipherSuite;
 

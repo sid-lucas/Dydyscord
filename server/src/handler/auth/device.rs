@@ -1,9 +1,3 @@
-use crate::config::constant;
-use crate::config::server::ServerState;
-use crate::database::model::Device;
-use crate::handler::auth::jwt::Claims;
-use crate::handler::auth::{self, jwt};
-
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use axum_extra::extract::cookie::CookieJar;
 use base64::Engine;
@@ -11,14 +5,17 @@ use common::{
     CreateDeviceResponse, DeviceKeyPackage, KeyPackagesUploadRequest, UserKeyPackageRequest,
     WelcomeFetchResponse, WelcomeStoreRequest,
 };
-use openmls::prelude::{
-    KeyPackageIn, ProtocolVersion,
-    tls_codec::{DeserializeBytes, Serialize as TlsSerialize},
-};
+use openmls::prelude::{KeyPackageIn, ProtocolVersion, tls_codec::DeserializeBytes};
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
 use redis::AsyncCommands;
 use uuid::Uuid;
+
+use crate::config::constant;
+use crate::config::server::ServerState;
+use crate::database::model::Device;
+use crate::handler::auth::jwt::Claims;
+use crate::handler::auth::{self, jwt};
 
 pub async fn create_device(
     State(state): State<ServerState>,

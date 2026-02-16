@@ -1,5 +1,3 @@
-use crate::config::constant;
-use crate::config::server::ServerState;
 use axum::{
     extract::Request, extract::State, http::StatusCode, middleware::Next, response::Response,
 };
@@ -9,6 +7,9 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use secrecy::{ExposeSecret, SecretSlice};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::config::constant;
+use crate::config::server::ServerState;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum TokenType {
