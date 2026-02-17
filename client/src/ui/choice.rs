@@ -1,5 +1,6 @@
 use std::fmt;
 
+use inquire::InquireError;
 use inquire_derive::Selectable;
 
 #[derive(Debug, Copy, Clone, Selectable)]
@@ -43,13 +44,33 @@ impl fmt::Display for LoggedInChoice {
 }
 
 pub fn prompt_logged_out() -> LoggedOutChoice {
-    LoggedOutChoice::select("Choose an option:")
-        .prompt()
-        .expect("An error occurred")
+    match LoggedOutChoice::select("Choose an option:").prompt() {
+        Ok(choice) => choice,
+        Err(InquireError::OperationInterrupted) => {
+            println!("");
+            println!("Bye.");
+            std::process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("");
+            eprintln!("Prompt error: {e}");
+            std::process::exit(1);
+        }
+    }
 }
 
 pub fn prompt_logged_in() -> LoggedInChoice {
-    LoggedInChoice::select("Choose an option:")
-        .prompt()
-        .expect("An error occurred")
+    match LoggedInChoice::select("Choose an option:").prompt() {
+        Ok(choice) => choice,
+        Err(InquireError::OperationInterrupted) => {
+            println!("");
+            println!("Bye.");
+            std::process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("");
+            eprintln!("Prompt error: {e}");
+            std::process::exit(1);
+        }
+    }
 }
