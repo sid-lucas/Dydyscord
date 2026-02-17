@@ -105,7 +105,7 @@ fn handle_logged_in(session: Session) {
         match choice::prompt_logged_in() {
             choice::LoggedInChoice::AddFriend => add_friend(),
             choice::LoggedInChoice::CreateGroup => create_group(&session),
-            choice::LoggedInChoice::ShowGroup => show_group(&session),
+            choice::LoggedInChoice::BrowseGroups => browse_groups(&session),
             choice::LoggedInChoice::FetchWelcome => fetch_welcome(&session),
             choice::LoggedInChoice::TestSession => test_session(),
             choice::LoggedInChoice::Logout => {
@@ -160,11 +160,11 @@ fn create_group(session: &Session) {
     println!("Creating group and inviting: {username}");
 }
 
-fn show_group(session: &Session) {
+fn browse_groups(session: &Session) {
     let groups: Vec<(openmls::prelude::GroupId, String)> =
         storage::database::retrieve_groups(session.db_key().unwrap(), session.user_id()).unwrap();
 
-    ui::chat::show_groups(groups);
+    ui::chat::browse_groups(groups);
 }
 
 fn fetch_welcome(session: &Session) {

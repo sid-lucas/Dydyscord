@@ -1,11 +1,11 @@
 use openmls::group::GroupId;
 
-pub fn show_groups(groups: Vec<(GroupId, String)>) {
-    struct Group {
-        id: GroupId,
-        name: String,
-    }
+struct Group {
+    id: GroupId,
+    name: String,
+}
 
+pub fn browse_groups(groups: Vec<(GroupId, String)>) {
     let groups: Vec<Group> = groups
         .into_iter()
         .map(|(id, name)| Group { id, name })
@@ -18,7 +18,11 @@ pub fn show_groups(groups: Vec<(GroupId, String)>) {
         .expect("An error occurred");
 
     match groups.into_iter().find(|g| g.name == selection) {
-        Some(group) => println!("You selected group with ID: {:?}", group.id),
+        Some(group) => show_chat(group),
         None => println!("Group not found"),
     }
+}
+
+fn show_chat(group: Group) {
+    println!("Showing chat for group ID: {:?}", group.id);
 }

@@ -24,7 +24,7 @@ impl fmt::Display for LoggedOutChoice {
 pub enum LoggedInChoice {
     AddFriend,
     CreateGroup,
-    ShowGroup,
+    BrowseGroups,
     FetchWelcome,
     TestSession,
     Logout,
@@ -35,7 +35,7 @@ impl fmt::Display for LoggedInChoice {
         match self {
             LoggedInChoice::AddFriend => write!(f, "Add a friend"),
             LoggedInChoice::CreateGroup => write!(f, "Create a group"),
-            LoggedInChoice::ShowGroup => write!(f, "Browse groups"),
+            LoggedInChoice::BrowseGroups => write!(f, "Browse groups"),
             LoggedInChoice::FetchWelcome => write!(f, "Fetch welcome"),
             LoggedInChoice::TestSession => write!(f, "Test session"),
             LoggedInChoice::Logout => write!(f, "Log Out"),
@@ -43,6 +43,7 @@ impl fmt::Display for LoggedInChoice {
     }
 }
 
+// TODO : factoriser en prompt_choice()
 pub fn prompt_logged_out() -> LoggedOutChoice {
     match LoggedOutChoice::select("Choose an option:").prompt() {
         Ok(choice) => choice,
