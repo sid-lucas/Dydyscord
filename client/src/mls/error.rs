@@ -20,6 +20,9 @@ pub enum MlsError {
     #[error("could not create key package")]
     KeyPackageCreate,
 
+    #[error("could not store key package")]
+    KeyPackageStore,
+
     #[error("could not deserialise key package")]
     KeyPackageDeserialize,
 

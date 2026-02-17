@@ -41,9 +41,9 @@ fn generate_credential_with_key(
 fn generate_key_package(
     signer: &SignatureKeyPair,
     credential_with_key: CredentialWithKey,
+    provider: &MyProvider,
 ) -> Result<KeyPackageBundle, AppError> {
     // Create the key package
-    let provider = &OpenMlsRustCrypto::default();
     let key_package = KeyPackage::builder()
         .build(
             constant::OPENMLS_CIPHERSUITE,
@@ -98,10 +98,14 @@ pub fn init_openmls(
         let pubkey_b64 = base64::engine::general_purpose::STANDARD.encode(signature_keys.public());
         storage::database::store_signature_pub_key(db_key, user_id, &pubkey_b64)?;
 
-        // Create 100 key package
-        let mut kp_bytes = Vec::with_capacity(100);
-        for _ in 0..100 {
-            let kp_bundle = generate_key_package(&signature_keys, credential_with_key.clone())?;
+        // Create X key packages
+        let mut kp_bytes = Vec::with_capacity(constant::OPENMLS_KEYPACKAGE_NUMBER);
+        for _ in 0..constant::OPENMLS_KEYPACKAGE_NUMBER {
+            // Generate (and store private part) key package
+            let kp_bundle =
+                generate_key_package(&signature_keys, credential_with_key.clone(), provider)?;
+
+            // Send only the public part of the bundle
             let bytes = kp_bundle
                 .key_package()
                 .tls_serialize_detached()

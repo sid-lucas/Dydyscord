@@ -142,7 +142,7 @@ fn create_group(session: Session) -> Option<AppState> {
             return Some(AppState::LoggedIn(session));
         }
     };
-    
+
     let username = match ui::prompt::invite_username() {
         Ok(username) => username,
         Err(e) => {
@@ -172,6 +172,10 @@ fn create_group(session: Session) -> Option<AppState> {
 
 fn show_group(session: Session) -> Option<AppState> {
     // TODO :
+    let ok =
+        storage::database::retrieve_groups(session.db_key().unwrap(), session.user_id()).unwrap();
+
+    dbg!(ok);
 
     Some(AppState::LoggedIn(session))
 }
