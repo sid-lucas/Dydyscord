@@ -37,5 +37,5 @@ pub fn invite_username() -> Result<String, UiError> {
 pub fn group_name() -> Result<String, UiError> {
     Text::new("Enter the desired group name:")
         .prompt()
-        .map_err(|_| UiError::Username)
+        .map_err(|_| UiError::GroupName)
 }

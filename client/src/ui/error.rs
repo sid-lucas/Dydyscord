@@ -6,4 +6,6 @@ pub enum UiError {
     Username,
     #[error("could not read password")]
     Password,
+    #[error("could not read group name")]
+    GroupName,
 }

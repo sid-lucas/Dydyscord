@@ -5,11 +5,6 @@ use crate::auth::opaque::LoginResult;
 use crate::error::AppError;
 use crate::mls::provider::{self, MyProvider};
 
-pub enum AppState {
-    LoggedOut,
-    LoggedIn(Session),
-}
-
 pub struct Session {
     user_id: String,
     device_id: Option<String>,

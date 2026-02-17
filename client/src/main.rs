@@ -6,80 +6,53 @@ mod storage;
 mod transport;
 mod ui;
 
-use auth::session::AppState;
 use auth::session::Session;
 use storage::database;
+use transport::http;
 use ui::choice;
 
-use crate::transport::http;
-
 fn main() {
-    let mut appstate = AppState::LoggedOut;
-
     loop {
-        let next = match appstate {
-            AppState::LoggedOut => handle_logged_out(),
-            AppState::LoggedIn(session) => handle_logged_in(session),
+        match choice::prompt_logged_out() {
+            choice::LoggedOutChoice::Signup => signup(),
+            choice::LoggedOutChoice::Login => {
+                let session = match login() {
+                    Some(session) => session,
+                    None => continue,
+                };
+                handle_logged_in(session);
+            }
+            choice::LoggedOutChoice::Quit => break,
         };
-
-        match next {
-            Some(state) => appstate = state,
-            None => break,
-        }
     }
 }
 
-fn handle_logged_out() -> Option<AppState> {
-    match choice::prompt_logged_out() {
-        choice::LoggedOutChoice::Signup => signup(),
-        choice::LoggedOutChoice::Login => login(),
-        choice::LoggedOutChoice::Quit => None,
-    }
-}
-
-fn handle_logged_in(session: Session) -> Option<AppState> {
-    match choice::prompt_logged_in() {
-        choice::LoggedInChoice::AddFriend => add_friend(session),
-        choice::LoggedInChoice::CreateGroup => create_group(session),
-        choice::LoggedInChoice::ShowGroup => show_group(session),
-        choice::LoggedInChoice::FetchWelcome => fetch_welcome(session),
-        choice::LoggedInChoice::TestSession => test_session(session),
-        choice::LoggedInChoice::Logout => {
-            drop(session);
-            println!("Logged out.");
-            Some(AppState::LoggedOut)
-        }
-    }
-}
-
-fn signup() -> Option<AppState> {
+fn signup() {
     let (username, password) = match ui::prompt::signup() {
         Ok((username, password)) => (username, password),
         Err(e) => {
             eprintln!("Signup failed: {e}");
-            return Some(AppState::LoggedOut);
+            return;
         }
     };
 
     match auth::opaque::register(&username, &password) {
         Ok(_) => {
             println!("Registration successful!");
-            Some(AppState::LoggedOut)
         }
         Err(e) => {
             eprintln!("Registration failed: {e}");
-            Some(AppState::LoggedOut)
         }
     }
 }
 
-fn login() -> Option<AppState> {
+fn login() -> Option<Session> {
     // OPAQUE handshake with the server and retrieval of JWT Auth
     let (username, password) = match ui::prompt::login() {
         Ok((username, password)) => (username, password),
         Err(e) => {
             eprintln!("Login failed: {e}");
-            return Some(AppState::LoggedOut);
+            return None;
         }
     };
 
@@ -88,7 +61,7 @@ fn login() -> Option<AppState> {
         Ok(login_result) => Session::new(login_result),
         Err(e) => {
             eprintln!("Login failed: {e}");
-            return Some(AppState::LoggedOut);
+            return None;
         }
     };
 
@@ -98,7 +71,7 @@ fn login() -> Option<AppState> {
             Ok(result) => result,
             Err(e) => {
                 eprintln!("Device storage initialization failed: {e}");
-                return Some(AppState::LoggedOut);
+                return None;
             }
         };
 
@@ -109,7 +82,7 @@ fn login() -> Option<AppState> {
     // Open the db connection and prepare the OpenMLS provider
     if let Err(e) = session.set_provider() {
         eprintln!("Login failed: {e}");
-        return Some(AppState::LoggedOut);
+        return None;
     }
 
     // Initialize OpenMLS
@@ -123,23 +96,40 @@ fn login() -> Option<AppState> {
     );
 
     println!("Login successful!");
-    Some(AppState::LoggedIn(session))
+
+    Some(session)
 }
 
-fn add_friend(session: Session) -> Option<AppState> {
+fn handle_logged_in(session: Session) {
+    loop {
+        match choice::prompt_logged_in() {
+            choice::LoggedInChoice::AddFriend => add_friend(),
+            choice::LoggedInChoice::CreateGroup => create_group(&session),
+            choice::LoggedInChoice::ShowGroup => show_group(&session),
+            choice::LoggedInChoice::FetchWelcome => fetch_welcome(&session),
+            choice::LoggedInChoice::TestSession => test_session(),
+            choice::LoggedInChoice::Logout => {
+                drop(session);
+                println!("Logged out.");
+                break;
+            }
+        };
+    }
+}
+
+fn add_friend() {
     if let Err(e) = http::test_session() {
         eprintln!("An error occured : {e}");
     }
     println!("Your request has been sent.");
-    Some(AppState::LoggedIn(session))
 }
 
-fn create_group(session: Session) -> Option<AppState> {
+fn create_group(session: &Session) {
     let group_name = match ui::prompt::group_name() {
         Ok(group_name) => group_name,
         Err(e) => {
             eprintln!("Could not read group name: {e}");
-            return Some(AppState::LoggedIn(session));
+            return;
         }
     };
 
@@ -147,7 +137,7 @@ fn create_group(session: Session) -> Option<AppState> {
         Ok(username) => username,
         Err(e) => {
             eprintln!("Could not read username: {e}");
-            return Some(AppState::LoggedIn(session));
+            return;
         }
     };
 
@@ -163,24 +153,21 @@ fn create_group(session: Session) -> Option<AppState> {
         Ok(_) => (),
         Err(e) => {
             eprintln!("Could not initialize group : {e}");
+            return;
         }
     }
 
     println!("Creating group and inviting: {username}");
-    Some(AppState::LoggedIn(session))
 }
 
-fn show_group(session: Session) -> Option<AppState> {
-    // TODO :
-    let ok =
+fn show_group(session: &Session) {
+    let groups: Vec<(openmls::prelude::GroupId, String)> =
         storage::database::retrieve_groups(session.db_key().unwrap(), session.user_id()).unwrap();
 
-    dbg!(ok);
-
-    Some(AppState::LoggedIn(session))
+    ui::chat::show_groups(groups);
 }
 
-fn fetch_welcome(session: Session) -> Option<AppState> {
+fn fetch_welcome(session: &Session) {
     // TODO : Change use of "unwrap", even tho provider cannot be "None" here...
     match mls::identity::fetch_welcome(
         session.db_key().unwrap(),
@@ -192,15 +179,13 @@ fn fetch_welcome(session: Session) -> Option<AppState> {
             eprintln!("Error fetching welcomes : {e}")
         }
     };
-
-    Some(AppState::LoggedIn(session))
 }
 
-fn test_session(session: Session) -> Option<AppState> {
+fn test_session() {
     if let Err(e) = http::test_session() {
         eprintln!("Not autorized (no Session token) : {e}");
-        return Some(AppState::LoggedOut);
+        return;
     }
+
     println!("Your session is valid.");
-    Some(AppState::LoggedIn(session))
 }
