@@ -135,18 +135,18 @@ fn add_friend(session: Session) -> Option<AppState> {
 }
 
 fn create_group(session: Session) -> Option<AppState> {
+    let group_name = match ui::prompt::group_name() {
+        Ok(group_name) => group_name,
+        Err(e) => {
+            eprintln!("Could not read group name: {e}");
+            return Some(AppState::LoggedIn(session));
+        }
+    };
+    
     let username = match ui::prompt::invite_username() {
         Ok(username) => username,
         Err(e) => {
             eprintln!("Could not read username: {e}");
-            return Some(AppState::LoggedIn(session));
-        }
-    };
-
-    let group_name = match ui::prompt::invite_username() {
-        Ok(group_name) => group_name,
-        Err(e) => {
-            eprintln!("Could not read group name: {e}");
             return Some(AppState::LoggedIn(session));
         }
     };
