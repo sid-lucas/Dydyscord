@@ -26,6 +26,9 @@ pub enum MlsError {
     #[error("key package is invalid")]
     KeyPackageInvalid,
 
+    #[error("could not set config to new group")]
+    GroupConfig,
+
     #[error("could not create a new group")]
     GroupCreate,
 

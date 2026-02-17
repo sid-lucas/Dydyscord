@@ -2,6 +2,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::{env, fs, path::PathBuf};
 
 use base64::Engine;
+use openmls::group::GroupId;
 use openmls_sqlite_storage::Connection;
 use rusqlite::{OptionalExtension, params};
 use secrecy::{ExposeSecret, SecretSlice};
@@ -134,6 +135,18 @@ fn ensure_app_state_table(conn: &Connection) -> Result<(), AppError> {
     Ok(())
 }
 
+fn ensure_group_table(conn: &Connection) -> Result<(), AppError> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS \"group\" (
+            id   BLOB PRIMARY KEY,
+            name TEXT NOT NULL
+        )",
+        [],
+    )
+    .map_err(|_| StorageError::DatabaseSchema)?;
+    Ok(())
+}
+
 pub fn store_device_id(
     db_key: &SecretSlice<u8>,
     user_id: &str,
@@ -200,6 +213,54 @@ pub fn read_signature_pub_key(db_key: &SecretSlice<u8>, user_id: &str) -> Result
         .map_err(|_| StorageError::DatabaseQuery)?;
 
     pub_key.ok_or(StorageError::PubKeyMissing.into())
+}
+
+pub fn store_group(
+    db_key: &SecretSlice<u8>,
+    user_id: &str,
+    id: &GroupId,
+    name: &str,
+) -> Result<(), AppError> {
+    let conn = open_sqlcipher(db_key, user_id)?;
+    ensure_group_table(&conn)?;
+
+    conn.execute(
+        "INSERT OR REPLACE INTO \"group\" (id, name) VALUES (?1, ?2)",
+        params![id.as_slice(), name],
+    )
+    .map_err(|_| StorageError::DatabaseQuery)?;
+
+    Ok(())
+}
+
+pub fn retrieve_groups(
+    db_key: &SecretSlice<u8>,
+    user_id: &str,
+) -> Result<Vec<(GroupId, String)>, AppError> {
+    let conn = open_sqlcipher(db_key, user_id)?;
+    ensure_group_table(&conn)?;
+
+    // Prepare the query that returns all group ids and names
+    let mut stmt = conn
+        .prepare("SELECT id, name FROM \"group\"")
+        .map_err(|_| StorageError::DatabaseQuery)?;
+
+    // Convert each row into a (GroupId, name) pair
+    let rows = stmt
+        .query_map([], |row| {
+            let id_bytes: Vec<u8> = row.get(0)?;
+            let name: String = row.get(1)?;
+            Ok((GroupId::from_slice(&id_bytes), name))
+        })
+        .map_err(|_| StorageError::DatabaseQuery)?;
+
+    // Collect the mapped rows into a Vec and return
+    let mut groups = Vec::new();
+    for row in rows {
+        groups.push(row.map_err(|_| StorageError::DatabaseQuery)?);
+    }
+
+    Ok(groups)
 }
 
 // Check whether a db + db_key already exist (device exists)

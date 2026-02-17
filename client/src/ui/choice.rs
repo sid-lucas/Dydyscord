@@ -23,6 +23,7 @@ impl fmt::Display for LoggedOutChoice {
 pub enum LoggedInChoice {
     AddFriend,
     CreateGroup,
+    ShowGroup,
     FetchWelcome,
     TestSession,
     Logout,
@@ -33,6 +34,7 @@ impl fmt::Display for LoggedInChoice {
         match self {
             LoggedInChoice::AddFriend => write!(f, "Add a friend"),
             LoggedInChoice::CreateGroup => write!(f, "Create a group"),
+            LoggedInChoice::ShowGroup => write!(f, "Browse groups"),
             LoggedInChoice::FetchWelcome => write!(f, "Fetch welcome"),
             LoggedInChoice::TestSession => write!(f, "Test session"),
             LoggedInChoice::Logout => write!(f, "Log Out"),

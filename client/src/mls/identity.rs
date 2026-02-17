@@ -126,29 +126,11 @@ pub fn init_group(
     device_id: &str,
     provider: &MyProvider,
     user_to_add: &str,
+    group_name: &str,
 ) -> Result<(), AppError> {
     let response = http::create_group(UserKeyPackageRequest {
         username: user_to_add.to_string(),
     })?;
-
-    // Retrieve the public signature key
-    let pubkey_b64 = storage::database::read_signature_pub_key(db_key, user_id)?;
-    let signature_pubkey = base64::engine::general_purpose::STANDARD
-        .decode(pubkey_b64)
-        .map_err(|_| MlsError::PubKeyDecode)?;
-
-    // Retrieve the signer (with the public signature key) and the credential
-    let (signer, credential_with_key) =
-        load_signer_and_credential(provider, device_id, signature_pubkey)?;
-
-    // TODO: set to false if we want privacy-first and send ratchet tree out-of-band
-    let cfg = MlsGroupCreateConfig::builder()
-        .use_ratchet_tree_extension(true)
-        .build();
-
-    // Create the group with the user information.
-    let mut new_group = MlsGroup::new(provider, &signer, &cfg, credential_with_key)
-        .map_err(|_| MlsError::GroupCreate)?;
 
     // Deserialize and verify keypackage(s) received
     let mut key_packages = Vec::with_capacity(response.len());
@@ -160,6 +142,44 @@ pub fn init_group(
             .map_err(|_| MlsError::KeyPackageInvalid)?;
         key_packages.push(kp);
     }
+
+    // Retrieve the public signature key
+    let pubkey_b64 = storage::database::read_signature_pub_key(db_key, user_id)?;
+    let signature_pubkey = base64::engine::general_purpose::STANDARD
+        .decode(pubkey_b64)
+        .map_err(|_| MlsError::PubKeyDecode)?;
+
+    // Retrieve the signer (with the public signature key) and the credential
+    let (signer, credential_with_key) =
+        load_signer_and_credential(provider, device_id, signature_pubkey)?;
+
+    // Define extension that contain our group name
+    let group_name_ext = Extension::Unknown(
+        constant::OPENMLS_EXT_GROUP_NAME,
+        UnknownExtension(group_name.as_bytes().to_vec()),
+    );
+
+    // TODO: set to false if we want privacy-first and send ratchet tree out-of-band
+    let cfg = MlsGroupCreateConfig::builder()
+        .use_ratchet_tree_extension(true)
+        .with_group_context_extensions(Extensions::single(group_name_ext))
+        .map_err(|_| MlsError::GroupConfig)?
+        .build();
+
+    // Create the group id (unique)
+    let unique_group_id = GroupId::random(provider.rand());
+    // Create the group with the user information.
+    let mut new_group = MlsGroup::new_with_group_id(
+        provider,
+        &signer,
+        &cfg,
+        unique_group_id.clone(),
+        credential_with_key,
+    )
+    .map_err(|_| MlsError::GroupCreate)?;
+
+    // Store the newly created group, so we can retrieve it later
+    storage::database::store_group(db_key, user_id, &unique_group_id, group_name)?;
 
     // Add members (1 keypackage per device)
     let (commit_msg, welcome_msg, group_info) = new_group
@@ -191,7 +211,11 @@ pub fn init_group(
     Ok(())
 }
 
-pub fn fetch_welcome(provider: &MyProvider) -> Result<(), AppError> {
+pub fn fetch_welcome(
+    db_key: &SecretSlice<u8>,
+    user_id: &str,
+    provider: &MyProvider,
+) -> Result<(), AppError> {
     let response = http::fetch_welcome()?;
 
     // List of the groups joined with the fetched welcome messages
@@ -228,10 +252,21 @@ pub fn fetch_welcome(provider: &MyProvider) -> Result<(), AppError> {
         let joined_group = staged_join
             .into_group(provider)
             .map_err(|_| MlsError::GroupJoin)?;
-        groups.push(joined_group);
 
-        // TODO : Stocker nous même le group_id dans une table créé par nos soins dans SQLite
-        // Ce group_id nous permet de rerecupérer les info mls du group pour send message...
+        // Get the unique group_id from the group
+        let group_id = joined_group.group_id();
+
+        // Get the name from the group extensions
+        let group_name = joined_group
+            .extensions()
+            .unknown(constant::OPENMLS_EXT_GROUP_NAME)
+            .map(|ext| String::from_utf8_lossy(&ext.0).to_string())
+            .unwrap_or_else(|| "Unnamed group".to_string());
+
+        // Store the group in local db
+        storage::database::store_group(db_key, user_id, group_id, &group_name)?;
+
+        groups.push(joined_group);
     }
     Ok(())
 }

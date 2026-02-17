@@ -11,3 +11,4 @@ pub const DB_KEY_EXTENSION: &str = ".key";
 
 pub const OPENMLS_CIPHERSUITE: Ciphersuite =
     Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
+pub const OPENMLS_EXT_GROUP_NAME: u16 = 0xff01;
