@@ -318,13 +318,15 @@ fn browse_groups(state: &mut AppState) -> Action {
     // Display the groups, and let the user choose one
     let selected_group = match prompt::browse_groups(groups) {
         Some(g) => g,
-        None => return Action::Back,
+        None => {
+            state.set_action_msg("You're not part of any groups.");
+            return Action::Back;
+        }
     };
 
     // Store the selected group in the app state
     state.set_selected_group(selected_group);
 
-    // Back to Browse Groups after exiting the TUI (Ctrl+C / Esc)
     Action::Push(Screen::Chatroom)
 }
 
