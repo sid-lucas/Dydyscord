@@ -5,12 +5,11 @@ mod mls;
 mod storage;
 mod transport;
 mod ui;
-mod tui;
 
 use auth::session::Session;
 use storage::database;
 use transport::http;
-use ui::choice;
+use ui::cli::{choice, prompt};
 
 fn main() {
     loop {
@@ -29,7 +28,7 @@ fn main() {
 }
 
 fn signup() {
-    let (username, password) = match ui::prompt::signup() {
+    let (username, password) = match prompt::signup() {
         Ok((username, password)) => (username, password),
         Err(e) => {
             eprintln!("Signup failed: {e}");
@@ -49,7 +48,7 @@ fn signup() {
 
 fn login() -> Option<Session> {
     // OPAQUE handshake with the server and retrieval of JWT Auth
-    let (username, password) = match ui::prompt::login() {
+    let (username, password) = match prompt::login() {
         Ok((username, password)) => (username, password),
         Err(e) => {
             eprintln!("Login failed: {e}");
@@ -126,7 +125,7 @@ fn add_friend() {
 }
 
 fn create_group(session: &Session) {
-    let group_name = match ui::prompt::group_name() {
+    let group_name = match prompt::group_name() {
         Ok(group_name) => group_name,
         Err(e) => {
             eprintln!("Could not read group name: {e}");
@@ -134,7 +133,7 @@ fn create_group(session: &Session) {
         }
     };
 
-    let username = match ui::prompt::invite_username() {
+    let username = match prompt::invite_username() {
         Ok(username) => username,
         Err(e) => {
             eprintln!("Could not read username: {e}");
@@ -165,7 +164,7 @@ fn browse_groups(session: &Session) {
     let groups: Vec<(openmls::prelude::GroupId, String)> =
         storage::database::retrieve_groups(session.db_key().unwrap(), session.user_id()).unwrap();
 
-    ui::chat::browse_groups(groups);
+    prompt::browse_groups(groups);
 }
 
 fn fetch_welcome(session: &Session) {

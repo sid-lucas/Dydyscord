@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     auth::error::AuthError, mls::error::MlsError, storage::error::StorageError,
-    transport::error::TransportError, ui::error::UiError,
+    transport::error::TransportError, ui::cli::error::UiError,
 };
 
 #[derive(Debug, Error)]

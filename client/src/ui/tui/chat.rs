@@ -5,6 +5,8 @@ pub struct ChatMessage {
     pub(crate) timestamp: String, // placeholder: simple string
 }
 
+// TODO : Est-ce vrm nécessaire ? pourquoi pas créer un "Chat" directement et de le passer au run, 
+// plutot qu'un "ChatState" qui est utilisé pour créer un nouveau "Chat"
 #[derive(Clone, Debug)]
 pub struct ChatState {
     pub room_name: String,

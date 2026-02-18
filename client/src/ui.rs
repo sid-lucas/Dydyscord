@@ -1,4 +1,2 @@
-pub mod chat;
-pub mod choice;
-pub mod error;
-pub mod prompt;
+pub mod cli;
+pub mod tui;
