@@ -6,19 +6,15 @@ use std::{
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 
-use super::{
-    chat::{Chat, ChatState},
-    draw,
-};
+use super::{chat::Chat, draw};
 
-pub fn run(state: ChatState) -> io::Result<()> {
+pub fn run(chat: &mut Chat) -> io::Result<()> {
     let mut terminal = init_terminal()?;
-    let mut chat = Chat::from_state(state);
-    let res = run_app(&mut terminal, &mut chat);
+    let res = run_app(&mut terminal, chat);
     restore_terminal(&mut terminal)?;
     res
 }
@@ -68,14 +64,16 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, chat: &mut Chat) -
 
 fn handle_key(chat: &mut Chat, key: KeyEvent) -> bool {
     // Quit
-    if key.code == KeyCode::Esc || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL)) {
+    if key.code == KeyCode::Esc
+        || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL))
+    {
         return true;
     }
 
     match key.code {
         KeyCode::Enter => {
             let msg = std::mem::take(&mut chat.input);
-            chat.push_message(chat.user_name.clone(), msg);
+            chat.push_message(chat.username.clone(), msg);
         }
         KeyCode::Backspace => {
             chat.input.pop();

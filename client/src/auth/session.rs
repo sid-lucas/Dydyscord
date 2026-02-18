@@ -6,10 +6,16 @@ use crate::error::AppError;
 use crate::mls::provider::{self, MyProvider};
 
 pub struct Session {
+    // User
+    username: String,
     user_id: String,
     device_id: Option<String>,
+
+    // Crypto
     export_key: SecretSlice<u8>,
     session_key: SecretSlice<u8>,
+
+    // Database
     db_key: Option<SecretSlice<u8>>,
     provider: Option<MyProvider>,
 }
@@ -17,6 +23,7 @@ pub struct Session {
 impl Session {
     pub fn new(login: LoginResult) -> Self {
         Session {
+            username: login.username,
             user_id: login.id.to_string(),
             device_id: None,
             export_key: login.export_key.into(),
@@ -26,24 +33,11 @@ impl Session {
         }
     }
 
-    // Setter
-    pub fn set_device_id(&mut self, id: &str) {
-        self.device_id = Some(id.to_string());
-    }
-
-    pub fn set_db_key(&mut self, db_key: SecretSlice<u8>) {
-        self.db_key = Some(db_key);
-    }
-
-    pub fn set_provider(&mut self) -> Result<(), AppError> {
-        let Some(db_key) = self.db_key.as_ref() else {
-            return Err(AuthError::SessionDbKeyUnset.into());
-        };
-        self.provider = Some(provider::prepare_provider(db_key, self.user_id())?);
-        Ok(())
-    }
-
     // Getter
+    pub fn username(&self) -> &str {
+        self.username.as_str()
+    }
+
     pub fn user_id(&self) -> &str {
         self.user_id.as_str()
     }
@@ -66,5 +60,22 @@ impl Session {
 
     pub fn provider(&self) -> Option<&MyProvider> {
         self.provider.as_ref()
+    }
+
+    // Setter
+    pub fn set_device_id(&mut self, id: &str) {
+        self.device_id = Some(id.to_string());
+    }
+
+    pub fn set_db_key(&mut self, db_key: SecretSlice<u8>) {
+        self.db_key = Some(db_key);
+    }
+
+    pub fn set_provider(&mut self) -> Result<(), AppError> {
+        let Some(db_key) = self.db_key.as_ref() else {
+            return Err(AuthError::SessionDbKeyUnset.into());
+        };
+        self.provider = Some(provider::prepare_provider(db_key, self.user_id())?);
+        Ok(())
     }
 }

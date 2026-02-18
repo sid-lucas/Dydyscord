@@ -1,6 +1,8 @@
 # Dydyscord
 
 TODO :
+- Revoir les fonctions / var créée avec "pub" et changer en "pub(crate)" selon nécessité...
+
 - Est-ce vraiment nécessaire de stocker les JWT dans redis ? ca permet la revokation et tt mais est-ce qu'on ne s'en foutrait pas..?
 - Garder le JWT Session dans la struct Session du client ?
 

@@ -5,68 +5,32 @@ pub struct ChatMessage {
     pub(crate) timestamp: String, // placeholder: simple string
 }
 
-// TODO : Est-ce vrm nécessaire ? pourquoi pas créer un "Chat" directement et de le passer au run, 
-// plutot qu'un "ChatState" qui est utilisé pour créer un nouveau "Chat"
-#[derive(Clone, Debug)]
-pub struct ChatState {
-    pub room_name: String,
-    pub user_name: String,
-    pub users: Vec<String>,
-    pub messages: Vec<ChatMessage>,
-}
-
 #[derive(Debug)]
 pub struct Chat {
-    pub(crate) room_name: String,
-    pub(crate) user_name: String,
+    pub(crate) groupname: String,
+    pub(crate) username: String,
 
+    pub(crate) members: Vec<String>,
+
+    // Message history
     pub(crate) messages: Vec<ChatMessage>,
+
     pub(crate) input: String,
 
     // scroll: how many lines we "skip" from the bottom
     pub(crate) scroll_from_bottom: u16,
-
-    // optional: user list
-    pub(crate) users: Vec<String>,
 }
 
 impl Chat {
-    pub fn new() -> Self {
+    pub fn new(groupname: &str, username: &str) -> Self {
         Self {
-            // TODO: set room name from external source (config/server/user selection)
-            room_name: "Room: general".to_string(),
-            // TODO: set user name from external source (login/profile)
-            user_name: "Me".to_string(),
-            messages: vec![
-                ChatMessage {
-                    // TODO: replace static seed messages with real history
-                    author: "System".to_string(),
-                    content: "Welcome to the chatroom (UI skeleton).".to_string(),
-                    // TODO: use real timestamps
-                    timestamp: "00:00".to_string(),
-                },
-                ChatMessage {
-                    author: "Alice".to_string(),
-                    content: "Hi!".to_string(),
-                    // TODO: use real timestamps
-                    timestamp: "00:01".to_string(),
-                },
-            ],
+            groupname: groupname.to_string(),
+            username: username.to_string(),
+            messages: Vec::new(),
             input: String::new(),
             scroll_from_bottom: 0,
             // TODO: replace with real user list from server/state
-            users: vec!["Alice".to_string(), "Bob".to_string(), "Me".to_string()],
-        }
-    }
-
-    pub fn from_state(state: ChatState) -> Self {
-        Self {
-            room_name: state.room_name,
-            user_name: state.user_name,
-            users: state.users,
-            messages: state.messages,
-            input: String::new(),
-            scroll_from_bottom: 0,
+            members: vec!["Alice".to_string(), "Bob".to_string(), "Me".to_string()],
         }
     }
 
@@ -107,3 +71,29 @@ impl Chat {
         self.scroll_from_bottom = self.scroll_from_bottom.saturating_sub(8);
     }
 }
+
+/*
+
+EXEMPLE CHAT :
+
+Self {
+    groupname: "Room: general".to_string(),
+    username: "Me".to_string(),
+    messages: vec![
+        ChatMessage {
+            author: "System".to_string(),
+            content: "Welcome to the chatroom (UI skeleton).".to_string(),
+            timestamp: "00:00".to_string(),
+        },
+        ChatMessage {
+            author: "Alice".to_string(),
+            content: "Hi!".to_string(),
+            timestamp: "00:01".to_string(),
+        },
+    ],
+    input: String::new(),
+    scroll_from_bottom: 0,
+    members: vec!["Alice".to_string(), "Bob".to_string(), "Me".to_string()],
+}
+
+*/

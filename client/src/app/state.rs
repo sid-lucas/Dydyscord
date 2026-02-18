@@ -1,11 +1,13 @@
 use crate::auth::session::Session;
 use crate::config::constant;
+use crate::ui::cli::prompt::Group;
 
 pub struct AppState {
     name: String,
     version: String,
     session: Option<Session>,   // Session of the logged in user
     action_msg: Option<String>, // Allow to keep the message to display it on next screen
+    selected_group: Option<Group>,
 }
 
 impl AppState {
@@ -15,6 +17,7 @@ impl AppState {
             version: constant::APP_VERSION.to_string(),
             session: None,
             action_msg: None,
+            selected_group: None,
         }
     }
 
@@ -29,6 +32,10 @@ impl AppState {
 
     pub fn session(&self) -> Option<&Session> {
         self.session.as_ref()
+    }
+
+    pub fn selected_group(&self) -> Option<&Group> {
+        self.selected_group.as_ref()
     }
 
     // Setter
@@ -49,5 +56,9 @@ impl AppState {
             println!("{msg}");
             println!("");
         }
+    }
+
+    pub fn set_selected_group(&mut self, group: Group) {
+        self.selected_group = Some(group);
     }
 }

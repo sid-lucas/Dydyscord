@@ -1,6 +1,9 @@
 use crate::{
     auth, mls, storage, transport,
-    ui::cli::{choice, prompt},
+    ui::{
+        cli::{choice, prompt},
+        tui,
+    },
 };
 
 use crossterm::{
@@ -19,9 +22,10 @@ pub enum Screen {
     FlowSignup,
     FlowLogin,
     MenuLoggedIn,
+    FlowAddFriend,
     FlowCreateGroup,
     MenuBrowseGroups,
-    FlowAddFriend,
+    Chatroom,
 }
 
 impl Screen {
@@ -31,9 +35,10 @@ impl Screen {
             Screen::FlowSignup => signup(state),
             Screen::FlowLogin => login(state),
             Screen::MenuLoggedIn => logged_in_menu(state),
+            Screen::FlowAddFriend => add_friend(state),
             Screen::FlowCreateGroup => create_group(state),
             Screen::MenuBrowseGroups => browse_groups(state),
-            Screen::FlowAddFriend => add_friend(state),
+            Screen::Chatroom => chatroom(state),
         }
     }
 }
@@ -127,32 +132,6 @@ fn logged_out_menu() -> Action {
     }
 }
 
-// Main menu when logged in, each choice goes to a screen or runs once
-fn logged_in_menu(state: &mut AppState) -> Action {
-    match choice::prompt_logged_in() {
-        Some(choice::LoggedInChoice::AddFriend) => {
-            add_friend(state);
-            Action::Stay
-        }
-        Some(choice::LoggedInChoice::CreateGroup) => Action::Push(Screen::FlowCreateGroup),
-        Some(choice::LoggedInChoice::BrowseGroups) => Action::Push(Screen::MenuBrowseGroups),
-        Some(choice::LoggedInChoice::FetchWelcome) => {
-            fetch_welcome(state);
-            Action::Stay
-        }
-        Some(choice::LoggedInChoice::TestSession) => {
-            test_session(state);
-            Action::Stay
-        }
-        Some(choice::LoggedInChoice::Logout) => {
-            state.set_session(None);
-            state.set_action_msg("Logged out.");
-            Action::Back
-        }
-        None => Action::Back,
-    }
-}
-
 // Signup screen, then go back
 fn signup(state: &mut AppState) -> Action {
     // Ask the user for his username and password
@@ -231,6 +210,51 @@ fn login(state: &mut AppState) -> Action {
     Action::Replace(Screen::MenuLoggedIn)
 }
 
+// Main menu when logged in, each choice goes to a screen or runs once
+fn logged_in_menu(state: &mut AppState) -> Action {
+    match choice::prompt_logged_in() {
+        Some(choice::LoggedInChoice::AddFriend) => {
+            add_friend(state);
+            Action::Stay
+        }
+        Some(choice::LoggedInChoice::CreateGroup) => Action::Push(Screen::FlowCreateGroup),
+        Some(choice::LoggedInChoice::BrowseGroups) => Action::Push(Screen::MenuBrowseGroups),
+        Some(choice::LoggedInChoice::FetchWelcome) => {
+            fetch_welcome(state);
+            Action::Stay
+        }
+        Some(choice::LoggedInChoice::TestSession) => {
+            test_session(state);
+            Action::Stay
+        }
+        Some(choice::LoggedInChoice::Logout) => {
+            state.set_session(None);
+            state.set_action_msg("Logged out.");
+            Action::Back
+        }
+        None => Action::Back,
+    }
+}
+
+// Add a new friend
+fn add_friend(state: &mut AppState) -> Action {
+    let user_to_add = match prompt::invite_username() {
+        Ok(user_to_add) => user_to_add,
+        Err(e) => {
+            state.set_action_msg(format!("Could not read username: {e}"));
+            return Action::Back;
+        }
+    };
+
+    // TODO : call server route to send friend request
+
+    state.set_action_msg(format!(
+        "Your friend request to '{}' has been sent.",
+        user_to_add
+    ));
+    Action::Back
+}
+
 // Create group screen, needs a session
 fn create_group(state: &mut AppState) -> Action {
     let session = match state.session() {
@@ -291,34 +315,50 @@ fn browse_groups(state: &mut AppState) -> Action {
     let groups: Vec<(openmls::prelude::GroupId, String)> =
         storage::database::retrieve_groups(session.db_key().unwrap(), session.user_id()).unwrap();
 
-    // TODO : handle case of NONE (remove unwrap())
+    // Display the groups, and let the user choose one
     let selected_group = match prompt::browse_groups(groups) {
         Some(g) => g,
         None => return Action::Back,
     };
 
-    state.set_action_msg(format!("You selected group: {}", selected_group.name));
-    Action::Back
+    // Store the selected group in the app state
+    state.set_selected_group(selected_group);
+
+    // Back to Browse Groups after exiting the TUI (Ctrl+C / Esc)
+    Action::Push(Screen::Chatroom)
 }
 
-// Add a new friend
-fn add_friend(state: &mut AppState) -> Action {
-    let user_to_add = match prompt::invite_username() {
-        Ok(user_to_add) => user_to_add,
-        Err(e) => {
-            state.set_action_msg(format!("Could not read username: {e}"));
+// Display the group (chatroom) previously selected and stored in the app state
+fn chatroom(state: &mut AppState) -> Action {
+    let session = match state.session() {
+        Some(s) => s,
+        None => {
+            state.set_action_msg("Not logged in.");
             return Action::Back;
         }
     };
 
-    // TODO : call server route to send friend request
+    // Retrieve the group
+    let group = match state.selected_group() {
+        Some(g) => g,
+        None => {
+            state.set_action_msg("No group selected.");
+            return Action::Back;
+        }
+    };
 
-    state.set_action_msg(format!(
-        "Your friend request to '{}' has been sent.",
-        user_to_add
-    ));
+    // Create a new chat with the desired group
+    let mut chat = tui::chat::Chat::new(&group.name, session.username());
+    if let Err(e) = tui::driver::run(&mut chat) {
+        state.set_action_msg(format!("Chat error: {e}"));
+    }
+
+    // When user exit, back to the group list (BrowseGroup)
     Action::Back
 }
+
+////////////////////
+// DEBUG FUNCTIONS :
 
 // Fetch welcome for current session
 fn fetch_welcome(state: &mut AppState) {

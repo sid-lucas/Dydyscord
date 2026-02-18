@@ -1,3 +1,4 @@
+use OpaqueCipherSuite as Default;
 use base64::Engine;
 use common::{
     OpaqueLoginFinishRequest, OpaqueLoginStartRequest, OpaqueRegisterFinishRequest,
@@ -8,7 +9,6 @@ use opaque_ke::{
     CipherSuite, ClientLogin, ClientLoginFinishParameters, ClientRegistration,
     ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
 };
-use OpaqueCipherSuite as Default;
 use rand::rngs::OsRng;
 use uuid::Uuid;
 
@@ -25,6 +25,7 @@ impl CipherSuite for OpaqueCipherSuite {
 }
 
 pub struct LoginResult {
+    pub username: String,
     pub id: Uuid,
     pub export_key: Vec<u8>, // TODO REVIEW with SecretSlice<u8>
     pub session_key: Vec<u8>,
@@ -133,6 +134,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     })?;
 
     Ok(LoginResult {
+        username: username.to_string(),
         id,
         export_key,
         session_key,

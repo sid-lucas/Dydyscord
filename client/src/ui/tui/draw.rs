@@ -10,7 +10,7 @@ use unicode_width::UnicodeWidthStr;
 use super::chat::Chat;
 
 pub fn ui(f: &mut Frame, chat: &Chat) {
-    // Global layout: top (header) / middle (chat+users) / bottom (input)
+    // Global layout: top (header) / middle (chat+members) / bottom (input)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -27,10 +27,10 @@ pub fn ui(f: &mut Frame, chat: &Chat) {
 
 fn draw_header(f: &mut Frame, area: Rect, chat: &Chat) {
     let title = Line::from(vec![
-        Span::styled(&chat.room_name, Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(&chat.groupname, Style::default().add_modifier(Modifier::BOLD)),
         Span::raw("   "),
         Span::raw("User: "),
-        Span::styled(&chat.user_name, Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(&chat.username, Style::default().add_modifier(Modifier::BOLD)),
         Span::raw("   "),
         Span::raw("Esc/Ctrl+C: quit | ↑↓ PgUp/PgDn: scroll"),
     ]);
@@ -40,7 +40,7 @@ fn draw_header(f: &mut Frame, area: Rect, chat: &Chat) {
 }
 
 fn draw_middle(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Two columns: chat + users (optional)
+    // Two columns: chat + members (optional)
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
@@ -82,13 +82,13 @@ fn draw_chat_history(f: &mut Frame, area: Rect, chat: &Chat) {
 }
 
 fn draw_users(f: &mut Frame, area: Rect, chat: &Chat) {
-    let block = Block::default().title("Users").borders(Borders::ALL);
+    let block = Block::default().title("Members").borders(Borders::ALL);
 
     let lines: Vec<Line> = chat
-        .users
+        .members
         .iter()
         .map(|u| {
-            if u == &chat.user_name {
+            if u == &chat.username {
                 Line::from(Span::styled(
                     format!("• {}", u),
                     Style::default().add_modifier(Modifier::BOLD),
