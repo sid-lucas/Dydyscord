@@ -1,29 +1,53 @@
 use crate::auth::session::Session;
+use crate::config::constant;
 
 pub struct AppState {
-    pub session: Option<Session>, // Session of the logged in user
-    pub flash: Option<String>, // Allow to keep the success/error message to display it on next screen
+    name: String,
+    version: String,
+    session: Option<Session>,   // Session of the logged in user
+    action_msg: Option<String>, // Allow to keep the message to display it on next screen
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
+            name: constant::APP_NAME.to_string(),
+            version: constant::APP_VERSION.to_string(),
             session: None,
-            flash: None,
+            action_msg: None,
         }
     }
 
-    pub fn set_flash(&mut self, msg: impl Into<String>) {
-        self.flash = Some(msg.into());
+    // Getter
+    pub fn name(&self) -> &str {
+        self.name.as_str()
     }
 
-    pub fn take_flash(&mut self) -> Option<String> {
-        self.flash.take()
+    pub fn version(&self) -> &str {
+        self.version.as_str()
     }
 
-    pub fn show_flash(&mut self) {
-        if let Some(msg) = self.flash.take() {
+    pub fn session(&self) -> Option<&Session> {
+        self.session.as_ref()
+    }
+
+    // Setter
+    pub fn set_session(&mut self, session: Option<Session>) {
+        self.session = session;
+    }
+
+    pub fn set_action_msg(&mut self, msg: impl Into<String>) {
+        self.action_msg = Some(msg.into());
+    }
+
+    pub fn has_action_msg(&self) -> bool {
+        self.action_msg.is_some()
+    }
+
+    pub fn show_action_msg(&mut self) {
+        if let Some(msg) = self.action_msg.take() {
             println!("{msg}");
+            println!("");
         }
     }
 }

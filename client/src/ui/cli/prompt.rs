@@ -34,12 +34,12 @@ pub fn login() -> Result<(String, String), UiError> {
 
 // Groups
 
-struct Group {
-    id: GroupId,
-    name: String,
+pub struct Group {
+    pub id: GroupId,
+    pub name: String,
 }
 
-pub fn browse_groups(groups: Vec<(GroupId, String)>) {
+pub fn browse_groups(groups: Vec<(GroupId, String)>) -> Option<Group> {
     let groups: Vec<Group> = groups
         .into_iter()
         .map(|(id, name)| Group { id, name })
@@ -49,18 +49,27 @@ pub fn browse_groups(groups: Vec<(GroupId, String)>) {
 
     let selection = match Select::new("Select a group:", options).prompt() {
         Ok(selection) => selection,
-        Err(InquireError::OperationCanceled | InquireError::OperationInterrupted) => return,
+        Err(InquireError::OperationCanceled | InquireError::OperationInterrupted) => return None,
         Err(e) => {
             eprintln!("");
             eprintln!("Prompt error: {e}");
-            return;
+            return None;
         }
     };
 
-    match groups.into_iter().find(|g| g.name == selection) {
-        Some(group) => show_chat(group),
-        None => println!("Group not found"),
-    }
+    let selected_group = match groups.into_iter().find(|g| g.name == selection) {
+        Some(group) => Some(group),
+        None => {
+            println!("Group not found");
+            None
+        }
+    };
+
+    selected_group
+}
+
+pub fn add_username() -> Result<String, UiError> {
+    prompt_text("Enter your friend's username:", UiError::Username)
 }
 
 pub fn invite_username() -> Result<String, UiError> {

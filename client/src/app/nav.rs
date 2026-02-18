@@ -21,6 +21,7 @@ pub enum Screen {
     MenuLoggedIn,
     FlowCreateGroup,
     MenuBrowseGroups,
+    FlowAddFriend,
 }
 
 impl Screen {
@@ -32,6 +33,7 @@ impl Screen {
             Screen::MenuLoggedIn => logged_in_menu(state),
             Screen::FlowCreateGroup => create_group(state),
             Screen::MenuBrowseGroups => browse_groups(state),
+            Screen::FlowAddFriend => add_friend(state),
         }
     }
 }
@@ -54,11 +56,18 @@ fn clear_terminal() {
     let _ = out.flush();
 }
 
+// Display the app name and version on top of screen
+fn display_header(state: &AppState) {
+    println!("{} - {}", state.name(), state.version());
+    println!("");
+}
+
 // Main router, all navigation is decided here
 pub fn run(state: &mut AppState) {
     // Screen stack, top is current screen
     // Allow to easily return to the previous screen
     let mut stack = vec![Screen::MenuLoggedOut];
+    let mut new_screen = true;
 
     loop {
         // Get current screen from stack top
@@ -67,24 +76,34 @@ pub fn run(state: &mut AppState) {
             None => break,
         };
 
+        if new_screen {
+            clear_terminal();
+            display_header(state);
+            state.show_action_msg();
+        }
+
         // Display the screen on terminal
         // And retrieve the user action
         let action = screen.handle(state);
 
-        let mut new_screen = false;
+        new_screen = false;
 
         // Apply the user action
         // Change the screen stack depending of what the user choosed
         match action {
             Action::Back => {
                 stack.pop();
-                new_screen = true;
                 if stack.is_empty() {
                     break;
                 }
+                new_screen = true;
             }
             Action::Quit => break,
-            Action::Stay => {}
+            Action::Stay => {
+                if state.has_action_msg() {
+                    new_screen = true;
+                }
+            }
             Action::Push(s) => {
                 stack.push(s);
                 new_screen = true;
@@ -94,11 +113,6 @@ pub fn run(state: &mut AppState) {
                 stack.push(s);
                 new_screen = true;
             }
-        }
-
-        if new_screen {
-            clear_terminal();
-            state.show_flash();
         }
     }
 }
@@ -117,7 +131,7 @@ fn logged_out_menu() -> Action {
 fn logged_in_menu(state: &mut AppState) -> Action {
     match choice::prompt_logged_in() {
         Some(choice::LoggedInChoice::AddFriend) => {
-            add_friend();
+            add_friend(state);
             Action::Stay
         }
         Some(choice::LoggedInChoice::CreateGroup) => Action::Push(Screen::FlowCreateGroup),
@@ -127,12 +141,12 @@ fn logged_in_menu(state: &mut AppState) -> Action {
             Action::Stay
         }
         Some(choice::LoggedInChoice::TestSession) => {
-            test_session();
+            test_session(state);
             Action::Stay
         }
         Some(choice::LoggedInChoice::Logout) => {
-            state.session = None;
-            state.set_flash("Logged out.");
+            state.set_session(None);
+            state.set_action_msg("Logged out.");
             Action::Back
         }
         None => Action::Back,
@@ -145,15 +159,15 @@ fn signup(state: &mut AppState) -> Action {
     let (username, password) = match prompt::signup() {
         Ok((username, password)) => (username, password),
         Err(e) => {
-            state.set_flash(format!("Signup failed: {e}"));
+            state.set_action_msg(format!("Signup failed: {e}"));
             return Action::Back;
         }
     };
 
     // Try to register with OPAQUE
     match auth::opaque::register(&username, &password) {
-        Ok(_) => state.set_flash("Registration successful!"),
-        Err(e) => state.set_flash(format!("Registration failed: {e}")),
+        Ok(_) => state.set_action_msg("Registration successful!"),
+        Err(e) => state.set_action_msg(format!("Registration failed: {e}")),
     }
 
     // Go back to main menu
@@ -166,7 +180,7 @@ fn login(state: &mut AppState) -> Action {
     let (username, password) = match prompt::login() {
         Ok((username, password)) => (username, password),
         Err(e) => {
-            state.set_flash(format!("Login failed: {e}"));
+            state.set_action_msg(format!("Login failed: {e}"));
             return Action::Back;
         }
     };
@@ -175,7 +189,7 @@ fn login(state: &mut AppState) -> Action {
     let mut session = match auth::opaque::login(&username, &password) {
         Ok(login_result) => Session::new(login_result),
         Err(e) => {
-            state.set_flash(format!("Login failed: {e}"));
+            state.set_action_msg(format!("Login failed: {e}"));
             return Action::Back;
         }
     };
@@ -185,7 +199,7 @@ fn login(state: &mut AppState) -> Action {
         match storage::database::init_device_storage(session.user_id(), session.export_key()) {
             Ok(result) => result,
             Err(e) => {
-                state.set_flash(format!("Device storage initialization failed: {e}"));
+                state.set_action_msg(format!("Device storage initialization failed: {e}"));
                 return Action::Back;
             }
         };
@@ -196,7 +210,7 @@ fn login(state: &mut AppState) -> Action {
 
     // Open DB and prepare OpenMLS provider
     if let Err(e) = session.set_provider() {
-        state.set_flash(format!("Login failed: {e}"));
+        state.set_action_msg(format!("Login failed: {e}"));
         return Action::Back;
     }
 
@@ -211,18 +225,18 @@ fn login(state: &mut AppState) -> Action {
     );
 
     // Everything went good -> login successful and proceed to the "Logged In" menu screen
-    state.set_flash("Login successful!");
+    state.set_action_msg("Login successful!");
 
-    state.session = Some(session);
+    state.set_session(Some(session));
     Action::Replace(Screen::MenuLoggedIn)
 }
 
 // Create group screen, needs a session
 fn create_group(state: &mut AppState) -> Action {
-    let session = match state.session.as_ref() {
+    let session = match state.session() {
         Some(s) => s,
         None => {
-            state.set_flash("Not logged in.");
+            state.set_action_msg("Not logged in.");
             return Action::Back;
         }
     };
@@ -230,15 +244,16 @@ fn create_group(state: &mut AppState) -> Action {
     let group_name = match prompt::group_name() {
         Ok(group_name) => group_name,
         Err(e) => {
-            state.set_flash(format!("Could not read group name: {e}"));
+            state.set_action_msg(format!("Could not read group name: {e}"));
             return Action::Back;
         }
     };
 
+    // TODO : Allow multiple user invitation, depending on future friendships
     let username = match prompt::invite_username() {
         Ok(username) => username,
         Err(e) => {
-            state.set_flash(format!("Could not read username: {e}"));
+            state.set_action_msg(format!("Could not read username: {e}"));
             return Action::Back;
         }
     };
@@ -254,21 +269,21 @@ fn create_group(state: &mut AppState) -> Action {
     ) {
         Ok(_) => (),
         Err(e) => {
-            state.set_flash(format!("Could not initialize group : {e}"));
+            state.set_action_msg(format!("Could not initialize group : {e}"));
             return Action::Back;
         }
     }
 
-    state.set_flash(format!("Creating group and inviting: {username}"));
+    state.set_action_msg(format!("New group '{}' created.", group_name));
     Action::Back
 }
 
 // Browse groups screen, needs a session
 fn browse_groups(state: &mut AppState) -> Action {
-    let session = match state.session.as_ref() {
+    let session = match state.session() {
         Some(s) => s,
         None => {
-            state.set_flash("Not logged in.");
+            state.set_action_msg("Not logged in.");
             return Action::Back;
         }
     };
@@ -276,24 +291,41 @@ fn browse_groups(state: &mut AppState) -> Action {
     let groups: Vec<(openmls::prelude::GroupId, String)> =
         storage::database::retrieve_groups(session.db_key().unwrap(), session.user_id()).unwrap();
 
-    prompt::browse_groups(groups);
+    // TODO : handle case of NONE (remove unwrap())
+    let selected_group = match prompt::browse_groups(groups) {
+        Some(g) => g,
+        None => return Action::Back,
+    };
+
+    state.set_action_msg(format!("You selected group: {}", selected_group.name));
     Action::Back
 }
 
-// One-shot helpers, no navigation change
-fn add_friend() {
-    if let Err(e) = transport::http::test_session() {
-        eprintln!("An error occured : {e}");
-    }
-    println!("Your request has been sent.");
+// Add a new friend
+fn add_friend(state: &mut AppState) -> Action {
+    let user_to_add = match prompt::invite_username() {
+        Ok(user_to_add) => user_to_add,
+        Err(e) => {
+            state.set_action_msg(format!("Could not read username: {e}"));
+            return Action::Back;
+        }
+    };
+
+    // TODO : call server route to send friend request
+
+    state.set_action_msg(format!(
+        "Your friend request to '{}' has been sent.",
+        user_to_add
+    ));
+    Action::Back
 }
 
 // Fetch welcome for current session
-fn fetch_welcome(state: &AppState) {
-    let session = match state.session.as_ref() {
+fn fetch_welcome(state: &mut AppState) {
+    let session = match state.session() {
         Some(s) => s,
         None => {
-            eprintln!("Not logged in.");
+            state.set_action_msg("Not logged in.");
             return;
         }
     };
@@ -304,17 +336,17 @@ fn fetch_welcome(state: &AppState) {
         session.user_id(),
         session.provider().unwrap(),
     ) {
-        Ok(_) => (),
-        Err(e) => eprintln!("Error fetching welcomes : {e}"),
+        Ok(_) => state.set_action_msg("Welcomes have been fetched."),
+        Err(e) => state.set_action_msg(format!("Error fetching welcomes : {e}")),
     };
 }
 
 // Test current session token
-fn test_session() {
+fn test_session(state: &mut AppState) {
     if let Err(e) = transport::http::test_session() {
-        eprintln!("Not autorized (no Session token) : {e}");
+        state.set_action_msg(format!("Not autorized (no Session token) : {e}"));
         return;
     }
 
-    println!("Your session is valid.");
+    state.set_action_msg("Your session is valid.");
 }
