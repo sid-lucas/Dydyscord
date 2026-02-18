@@ -103,16 +103,17 @@ fn login() -> Option<Session> {
 fn handle_logged_in(session: Session) {
     loop {
         match choice::prompt_logged_in() {
-            choice::LoggedInChoice::AddFriend => add_friend(),
-            choice::LoggedInChoice::CreateGroup => create_group(&session),
-            choice::LoggedInChoice::BrowseGroups => browse_groups(&session),
-            choice::LoggedInChoice::FetchWelcome => fetch_welcome(&session),
-            choice::LoggedInChoice::TestSession => test_session(),
-            choice::LoggedInChoice::Logout => {
+            Some(choice::LoggedInChoice::AddFriend) => add_friend(),
+            Some(choice::LoggedInChoice::CreateGroup) => create_group(&session),
+            Some(choice::LoggedInChoice::BrowseGroups) => browse_groups(&session),
+            Some(choice::LoggedInChoice::FetchWelcome) => fetch_welcome(&session),
+            Some(choice::LoggedInChoice::TestSession) => test_session(),
+            Some(choice::LoggedInChoice::Logout) => {
                 drop(session);
                 println!("Logged out.");
                 break;
             }
+            None => break, // Ctrl+C / ESC -> retour menu précédent
         };
     }
 }

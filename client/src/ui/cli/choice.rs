@@ -47,7 +47,7 @@ impl fmt::Display for LoggedInChoice {
 pub fn prompt_logged_out() -> LoggedOutChoice {
     match LoggedOutChoice::select("Choose an option:").prompt() {
         Ok(choice) => choice,
-        Err(InquireError::OperationInterrupted) => {
+        Err(InquireError::OperationCanceled | InquireError::OperationInterrupted) => {
             println!("");
             println!("Bye.");
             std::process::exit(0);
@@ -60,18 +60,14 @@ pub fn prompt_logged_out() -> LoggedOutChoice {
     }
 }
 
-pub fn prompt_logged_in() -> LoggedInChoice {
+pub fn prompt_logged_in() -> Option<LoggedInChoice> {
     match LoggedInChoice::select("Choose an option:").prompt() {
-        Ok(choice) => choice,
-        Err(InquireError::OperationInterrupted) => {
-            println!("");
-            println!("Bye.");
-            std::process::exit(0);
-        }
+        Ok(choice) => Some(choice),
+        Err(InquireError::OperationCanceled | InquireError::OperationInterrupted) => None,
         Err(e) => {
             eprintln!("");
             eprintln!("Prompt error: {e}");
-            std::process::exit(1);
+            None
         }
     }
 }

@@ -1,45 +1,38 @@
-use inquire::{Password, Text};
+use inquire::{InquireError, Password, Select, Text};
 use openmls::group::GroupId;
 
 use crate::ui::cli::error::UiError;
 
-// TODO : Factoriser d'une manière ou d'une autre... répétitions....
+// Helpers
+
+fn prompt_text(label: &str, err: UiError) -> Result<String, UiError> {
+    Text::new(label).prompt().map_err(|_| err)
+}
+
+fn prompt_password(label: &str, confirm: bool, err: UiError) -> Result<String, UiError> {
+    let mut p = Password::new(label);
+    if !confirm {
+        p = p.without_confirmation();
+    }
+    p.prompt().map_err(|_| err)
+}
+
+// Public functions
+// Auth
 
 pub fn signup() -> Result<(String, String), UiError> {
-    let username = Text::new("Enter your username:")
-        .prompt()
-        .map_err(|_| UiError::Username)?;
-
-    let password = Password::new("Enter your password:")
-        .prompt()
-        .map_err(|_| UiError::Password)?;
+    let username = prompt_text("Enter your username:", UiError::Username)?;
+    let password = prompt_password("Enter your password:", true, UiError::Password)?;
     Ok((username, password))
 }
 
 pub fn login() -> Result<(String, String), UiError> {
-    let username = Text::new("Enter your username:")
-        .prompt()
-        .map_err(|_| UiError::Username)?;
-
-    let password = Password::new("Enter your password:")
-        .without_confirmation()
-        .prompt()
-        .map_err(|_| UiError::Password)?;
-
+    let username = prompt_text("Enter your username:", UiError::Username)?;
+    let password = prompt_password("Enter your password:", false, UiError::Password)?;
     Ok((username, password))
 }
 
-pub fn invite_username() -> Result<String, UiError> {
-    Text::new("Enter the username to invite:")
-        .prompt()
-        .map_err(|_| UiError::Username)
-}
-
-pub fn group_name() -> Result<String, UiError> {
-    Text::new("Enter the desired group name:")
-        .prompt()
-        .map_err(|_| UiError::GroupName)
-}
+// Groups
 
 struct Group {
     id: GroupId,
@@ -54,14 +47,28 @@ pub fn browse_groups(groups: Vec<(GroupId, String)>) {
 
     let options: Vec<String> = groups.iter().map(|g| g.name.clone()).collect();
 
-    let selection = inquire::Select::new("Select a group:", options)
-        .prompt()
-        .expect("An error occurred");
+    let selection = match Select::new("Select a group:", options).prompt() {
+        Ok(selection) => selection,
+        Err(InquireError::OperationCanceled | InquireError::OperationInterrupted) => return,
+        Err(e) => {
+            eprintln!("");
+            eprintln!("Prompt error: {e}");
+            return;
+        }
+    };
 
     match groups.into_iter().find(|g| g.name == selection) {
         Some(group) => show_chat(group),
         None => println!("Group not found"),
     }
+}
+
+pub fn invite_username() -> Result<String, UiError> {
+    prompt_text("Enter the username to invite:", UiError::Username)
+}
+
+pub fn group_name() -> Result<String, UiError> {
+    prompt_text("Enter the desired group name:", UiError::GroupName)
 }
 
 fn show_chat(group: Group) {
