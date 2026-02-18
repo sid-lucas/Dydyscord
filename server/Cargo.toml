@@ -6,18 +6,22 @@ edition = "2024"
 [dependencies]
 common = { path = "../common" }
 
-axum = { version = "0.8.8" }
+axum = { version = "0.8.8", features = ["ws"] }
 axum-extra = { version = "0.12.5", features = ["cookie"] }
 
 tokio = { version = "1.49.0", features = ["full"] }
+
+dashmap = "6.1.0"
+futures-util = "0.3.31"
 
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 
 dotenv = "0.15"
 
 chrono = { version = "0.4.43", features = ["serde"] }
-serde = { version = "1.0.228", features = ["derive"] }
 uuid = { version = "1.20.0", features = ["v4", "serde"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 
 redis = { version = "1.0.3", features = ["tokio-comp", "connection-manager"] }
 sqlx = { version = "0.8", features = [

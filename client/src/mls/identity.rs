@@ -12,7 +12,7 @@ use crate::error::AppError;
 use crate::mls::error::MlsError;
 use crate::mls::provider::MyProvider;
 use crate::storage;
-use crate::transport::http;
+use crate::transport::api;
 
 // TODO Rename file, does not correspond to what it does
 
@@ -113,7 +113,7 @@ pub fn init_openmls(
             kp_bytes.push(bytes);
         }
         // serialize the key packages and send them to the server to be stored in the db
-        http::send_key_packages(
+        api::send_key_packages(
             device_id,
             KeyPackagesUploadRequest {
                 key_packages: kp_bytes,
@@ -132,7 +132,7 @@ pub fn init_group(
     user_to_add: &str,
     group_name: &str,
 ) -> Result<(), AppError> {
-    let response = http::create_group(UserKeyPackageRequest {
+    let response = api::create_group(UserKeyPackageRequest {
         username: user_to_add.to_string(),
     })?;
 
@@ -207,7 +207,7 @@ pub fn init_group(
 
     println!("Sending welcome to serveur...");
 
-    http::send_welcome(WelcomeStoreRequest {
+    api::send_welcome(WelcomeStoreRequest {
         device_ids,
         welcome_b64,
     })?;
@@ -220,7 +220,7 @@ pub fn fetch_welcome(
     user_id: &str,
     provider: &MyProvider,
 ) -> Result<(), AppError> {
-    let response = http::fetch_welcome()?;
+    let response = api::fetch_welcome()?;
 
     // List of the groups joined with the fetched welcome messages
     let mut groups: Vec<MlsGroup> = Vec::new();

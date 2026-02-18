@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
+use axum::extract::ws::Message;
 use base64::Engine;
+use dashmap::DashMap;
 use dotenv::dotenv;
 use opaque_ke::ServerSetup;
-use redis::aio::ConnectionManager;
 use redis::Client as RedisClient;
+use redis::aio::ConnectionManager;
 use secrecy::SecretSlice;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use tokio::sync::mpsc;
 
 use crate::config::constant;
 use crate::handler::auth::opaque::DefaultCipherSuite as OpaqueCiphersuite;
@@ -19,6 +22,8 @@ pub struct ServerState {
     opaque_setup: Arc<ServerSetup<OpaqueCiphersuite>>,
     pepper: Arc<SecretSlice<u8>>,
     jwt_key: Arc<SecretSlice<u8>>,
+
+    pub sockets: Arc<DashMap<String, mpsc::UnboundedSender<Message>>>,
 }
 
 impl ServerState {
@@ -31,6 +36,7 @@ impl ServerState {
         let opaque_setup = Self::init_opaque();
         let pepper = Self::init_pepper();
         let jwt_key = Self::init_jwt_key();
+        let sockets = Arc::new(DashMap::new());
 
         ServerState {
             pool,
@@ -38,6 +44,7 @@ impl ServerState {
             opaque_setup,
             pepper,
             jwt_key,
+            sockets,
         }
     }
 

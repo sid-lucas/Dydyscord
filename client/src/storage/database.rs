@@ -10,7 +10,7 @@ use secrecy::{ExposeSecret, SecretSlice};
 use crate::config::constant;
 use crate::error::AppError;
 use crate::storage::{crypto, error::StorageError};
-use crate::transport::http;
+use crate::transport::api;
 
 // TODO Maybe split into multiple files, to discuss
 
@@ -301,7 +301,7 @@ pub fn init_device_storage(
 
     let device_id = match device_id {
         Some(id) => {
-            http::get_device()?; // TODO : Check if the device_id is still valid on the server, if not consider the device as new and re-register
+            api::get_device()?; // TODO : Check if the device_id is still valid on the server, if not consider the device as new and re-register
             id
         }
         None => {
@@ -309,7 +309,7 @@ pub fn init_device_storage(
             is_new_device = true;
 
             // Retrieve the new device_id and Session token
-            let response = http::create_device()?;
+            let response = api::create_device()?;
             let device_id = response.device_id.to_string();
 
             // Store device_id in local db

@@ -1,3 +1,4 @@
+use axum::extract::ws::Message;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use base64::Engine;
 use common::{DeviceKeyPackage, KeyPackagesUploadRequest, UserKeyPackageRequest};
@@ -5,6 +6,7 @@ use common::{WelcomeFetchResponse, WelcomeStoreRequest};
 use openmls::prelude::{KeyPackageIn, ProtocolVersion, tls_codec::DeserializeBytes};
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::config::server::ServerState;
@@ -105,6 +107,14 @@ pub async fn store_welcome(
         .execute(&state.pool())
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        if let Some(tx) = state.sockets.get(&device_id.to_string()) {
+            let msg = Message::Text(r#"{"type":"welcome_ready"}"#.into());
+            if tx.send(msg).is_err() {
+                // socket dead -> cleanup
+                state.sockets.remove(&device_id.to_string());
+            }
+        }
     }
 
     Ok(StatusCode::OK)

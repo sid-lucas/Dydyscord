@@ -2,6 +2,7 @@ pub mod auth;
 pub mod jwt;
 pub mod mls;
 pub mod root;
+pub mod ws;
 
 use hmac::Mac;
 use secrecy::{ExposeSecret, SecretSlice};

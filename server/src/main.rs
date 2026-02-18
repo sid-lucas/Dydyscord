@@ -54,6 +54,13 @@ async fn main() {
                 handler::jwt::verify_jwt_session,
             )),
         )
+        .route(
+            "/ws",
+            get(handler::ws::establish_conn).layer(middleware::from_fn_with_state(
+                server_state.clone(),
+                handler::jwt::verify_jwt_session,
+            )),
+        )
         // Routes protected by an Auth JWT:
         .route(
             "/device",

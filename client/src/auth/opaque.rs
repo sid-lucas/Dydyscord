@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::auth::error::AuthError;
 use crate::error::AppError;
-use crate::transport::http;
+use crate::transport::api;
 
 struct OpaqueCipherSuite;
 
@@ -43,7 +43,7 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
         base64::engine::general_purpose::STANDARD.encode(start.message.serialize());
 
     // API call (send request and receive response)
-    let response = http::opaque_register(OpaqueRegisterStartRequest {
+    let response = api::opaque_register(OpaqueRegisterStartRequest {
         username: username.to_string(),
         request_b64: start_register_request,
     })?;
@@ -73,7 +73,7 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
     // API call (send request and receive response)
-    http::opaque_register_finish(OpaqueRegisterFinishRequest {
+    api::opaque_register_finish(OpaqueRegisterFinishRequest {
         username: username.to_string(),
         request_b64: finish_register_request,
     })?;
@@ -95,7 +95,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
     // TODO : fix timing attack
 
     // API call (send request and receive response)
-    let response = http::opaque_login(OpaqueLoginStartRequest {
+    let response = api::opaque_login(OpaqueLoginStartRequest {
         username: username.to_string(),
         request_b64: start_login_request,
     })?;
@@ -128,7 +128,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
         base64::engine::general_purpose::STANDARD.encode(finish.message.serialize());
 
     // API call (send request and receive response)
-    http::opaque_login_finish(OpaqueLoginFinishRequest {
+    api::opaque_login_finish(OpaqueLoginFinishRequest {
         user_id: id,
         request_b64: finish_login_request,
     })?;

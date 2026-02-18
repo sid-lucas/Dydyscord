@@ -69,23 +69,24 @@ fn display_header(state: &AppState) {
 
 // Main router, all navigation is decided here
 pub fn run(state: &mut AppState) {
+    let mut new_screen = true;
+
     // Screen stack, top is current screen
     // Allow to easily return to the previous screen
     let mut stack = vec![Screen::MenuLoggedOut];
-    let mut new_screen = true;
 
     loop {
+        if new_screen {
+            //clear_terminal();
+            display_header(state);
+            state.show_action_msg();
+        }
+
         // Get current screen from stack top
         let screen = match stack.last().copied() {
             Some(s) => s,
             None => break,
         };
-
-        if new_screen {
-            clear_terminal();
-            display_header(state);
-            state.show_action_msg();
-        }
 
         // Display the screen on terminal
         // And retrieve the user action
@@ -207,6 +208,10 @@ fn login(state: &mut AppState) -> Action {
     state.set_action_msg("Login successful!");
 
     state.set_session(Some(session));
+
+    // Spawn the websocket in background
+    transport::ws::start_background();
+
     Action::Replace(Screen::MenuLoggedIn)
 }
 
@@ -385,7 +390,7 @@ fn fetch_welcome(state: &mut AppState) {
 
 // Test current session token
 fn test_session(state: &mut AppState) {
-    if let Err(e) = transport::http::test_session() {
+    if let Err(e) = transport::api::test_session() {
         state.set_action_msg(format!("Not autorized (no Session token) : {e}"));
         return;
     }

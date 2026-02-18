@@ -7,19 +7,31 @@ use common::{
     WelcomeFetchResponse, WelcomeStoreRequest,
 };
 use once_cell::sync::Lazy;
+use reqwest::Url;
+use reqwest::cookie::{CookieStore, Jar};
 use reqwest::{Method, StatusCode, blocking::Client};
 use serde::Serialize;
+use std::sync::Arc;
 
 use crate::config::constant;
 use crate::transport::error::TransportError;
 
+static COOKIE_JAR: Lazy<Arc<Jar>> = Lazy::new(|| Arc::new(Jar::default()));
+
 static CLIENT: Lazy<Client> = Lazy::new(|| {
     Client::builder()
-        .cookie_store(true)
+        .cookie_provider(COOKIE_JAR.clone())
         .timeout(Duration::from_secs(constant::HTTP_TIMEOUT_SECS))
         .build()
         .unwrap()
 });
+
+// Return the header "Cookie: ..." for the server domain
+pub fn session_cookie_header() -> Option<String> {
+    let url = Url::parse(constant::SERVER_URL).ok()?;
+    let hv = COOKIE_JAR.cookies(&url)?;
+    hv.to_str().ok().map(|s| s.to_string())
+}
 
 // Build the full endpoint URL
 fn url(path: &str) -> String {
