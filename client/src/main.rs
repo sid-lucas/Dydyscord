@@ -5,6 +5,7 @@ mod mls;
 mod storage;
 mod transport;
 mod ui;
+mod tui;
 
 use auth::session::Session;
 use storage::database;
