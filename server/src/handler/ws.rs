@@ -51,7 +51,10 @@ async fn handle_socket(socket: WebSocket, state: ServerState, device_id: Uuid) {
             Message::Binary(_bin) => {
                 // handle si besoin
             }
-            Message::Close(_) => break,
+            Message::Close(_) => {
+                println!("WS closed for device_id={device_id}");
+                break;
+            }
             _ => {}
         }
     }

@@ -1,4 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
+use http::header::COOKIE;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::config::constant;
@@ -16,7 +18,7 @@ pub fn start_background() {
     let ws_url = ws_url_from_http(constant::SERVER_URL);
 
     // TODO : REprendre ici
-    let res = connect_ws(&ws_url, &session_cookie);
+    let res = connect_ws(ws_url.clone(), session_cookie.clone());
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         match rt.block_on(res) {
@@ -37,18 +39,18 @@ fn ws_url_from_http(http_url: &str) -> String {
 }
 
 pub async fn connect_ws(
-    ws_url: &str,
-    session_cookie: &str,
+    ws_url: String,
+    session_cookie: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Build request with cookie header
-    let mut req = http::Request::builder()
-        .uri(ws_url)
-        .header("Cookie", session_cookie)
-        .body(())?;
+    // Add Sec-WebSocket-Key, etc.
+    let mut req = ws_url.into_client_request()?;
+    req.headers_mut().insert(COOKIE, session_cookie.parse()?);
 
     let (ws_stream, resp) = connect_async(req).await?;
-    println!("WS status: {}", resp.status()); // doit afficher 101
-    println!("WS headers: {:?}", resp.headers());
+
+    println!("WS status: {}", resp.status());
+
     let (mut ws_tx, mut ws_rx) = ws_stream.split();
 
     // Optionnel: envoyer un "hello"
@@ -61,21 +63,7 @@ pub async fn connect_ws(
                 // ex: {"type":"welcome_ready"}
                 // si welcome_ready -> fetch_welcome()
                 // Fetch welcome for current session
-                match crate::transport::api::fetch_welcome() {
-                    Ok(welcomes) => {
-                        if welcomes.is_empty() {
-                            println!("WS: welcome_ready reçu, mais aucun welcome en DB");
-                        } else {
-                            println!(
-                                "WS: {} welcome(s) reçus via fetch_welcome()",
-                                welcomes.len()
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        println!("WS: fetch_welcome() failed: {e}");
-                    }
-                }
+                println!("Salut a tous");
             }
             Message::Binary(bin) => {
                 // ex: welcome OpenMLS bytes
