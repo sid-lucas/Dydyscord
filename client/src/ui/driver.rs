@@ -11,11 +11,10 @@ use crossterm::{
 use ratatui::{Terminal, backend::CrosstermBackend};
 use secrecy::SecretSlice;
 
-use crate::ui::app::{self, SignupField};
-
 use super::{
-    app::{App, LoginField, MenuPageKind, MenuState, View},
+    app::App,
     draw,
+    view::{LoginField, MenuPageKind, MenuState, SignupField, View},
 };
 
 pub fn run(app: App) -> io::Result<()> {
@@ -83,21 +82,55 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     let is_esc = key.code == KeyCode::Esc;
 
     if is_ctrl_c || is_esc {
-        if app.session.is_some() {
-            app.logout();
-            return app.should_quit;
+        enum ExitAction {
+            Quit,
+            Logout,
+            MenuBack,
+            ReturnToMenu(MenuState),
         }
-        app.should_quit = true;
-        return true;
+
+        let action = match &app.view {
+            View::Menu(menu) => {
+                if menu.stack.len() > 1 {
+                    ExitAction::MenuBack
+                } else if menu.current().kind == MenuPageKind::LoggedOut {
+                    ExitAction::Quit
+                } else {
+                    ExitAction::Logout
+                }
+            }
+            View::Login(form) => ExitAction::ReturnToMenu(form.return_menu.clone()),
+            View::Signup(form) => ExitAction::ReturnToMenu(form.return_menu.clone()),
+        };
+
+        match action {
+            ExitAction::Quit => {
+                app.should_quit = true;
+                return true;
+            }
+            ExitAction::Logout => {
+                app.logout();
+                return app.should_quit;
+            }
+            ExitAction::MenuBack => {
+                if let View::Menu(menu) = &mut app.view {
+                    menu.pop();
+                }
+                return app.should_quit;
+            }
+            ExitAction::ReturnToMenu(menu) => {
+                app.view = View::Menu(menu);
+                return app.should_quit;
+            }
+        }
     }
 
-    // Snapshot the view so we can borrow app safely in handlers.
-    let view_snapshot = app.view.clone();
-    match view_snapshot {
-        View::Menu(_) => handle_menu_key(app, key),
-        View::Login(_) => handle_login_key(app, key),
-        View::Signup(_) => handle_signup_key(app, key),
+    let handler: fn(&mut App, KeyEvent) = match &app.view {
+        View::Menu(_) => handle_menu_key,
+        View::Login(_) => handle_login_key,
+        View::Signup(_) => handle_signup_key,
     };
+    handler(app, key);
 
     app.should_quit
 }

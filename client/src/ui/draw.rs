@@ -7,11 +7,12 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::ui::app::{SignupField, SignupFormState};
-
 use super::{
-    app::{App, LoginField, LoginFormState, MenuPageKind, MenuState, View},
-    chat::Chat,
+    app::App,
+    view::{
+        Chat, LoginField, LoginFormState, MenuPageKind, MenuState, SignupField, SignupFormState,
+        View,
+    },
 };
 
 pub fn ui(f: &mut Frame, app: &App) {
@@ -116,8 +117,8 @@ fn draw_signup_form(f: &mut Frame, form: &SignupFormState) {
     let username_label = "Username: ";
     let password_label = "Password: ";
     let confirm_password_label = "Confirm Password: ";
-    let password_mask = "*".repeat(form.password.expose_secret().len());
-    let confirm_password_mask = "*".repeat(form.confirm_password.expose_secret().len());
+    let password_mask = "*".repeat(form.password_len());
+    let confirm_password_mask = "*".repeat(form.confirm_len());
 
     let username_style = if form.active == SignupField::Username {
         Style::default().add_modifier(Modifier::BOLD)
@@ -193,7 +194,7 @@ fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
 
     let username_label = "Username: ";
     let password_label = "Password: ";
-    let password_mask = "*".repeat(form.password.chars().count());
+    let password_mask = "*".repeat(form.password_len());
 
     let username_style = if form.active == LoginField::Username {
         Style::default().add_modifier(Modifier::BOLD)
