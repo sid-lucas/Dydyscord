@@ -5,7 +5,7 @@ use crate::{auth::session::Session, config::constant};
 use super::view::{FormState, MenuAction, MenuEntry, MenuPageKind, MenuState, View};
 
 // How often the menu status line rotates.
-const STATUS_ROTATE_EVERY: Duration = Duration::from_secs(2);
+const STATUS_ROTATE_EVERY: Duration = Duration::from_secs(1);
 // Rotating messages shown only in menu views.
 const STATUS_MESSAGES: &[&str] = &[
     "Etat: synchronisation des salons...",
@@ -120,19 +120,21 @@ impl App {
                 }
             }
             MenuAction::Signup => {
-                // Open the signup form (not implemented yet, so just goes to login).
+                // Get the current menu to be able to get back to it : return_menu
                 let return_menu = match &self.view {
                     View::Menu(menu) => menu.clone(),
                     _ => MenuState::logged_out(),
                 };
+                // Open the signup form
                 self.view = View::Form(FormState::signup(return_menu));
             }
             MenuAction::Login => {
-                // Open the login form, with the current menu as the return target.
+                // Get the current menu to be able to get back to it : return_menu
                 let return_menu = match &self.view {
                     View::Menu(menu) => menu.clone(),
                     _ => MenuState::logged_out(),
                 };
+                // Open the login form
                 self.view = View::Form(FormState::login(return_menu));
             }
             MenuAction::Back => {

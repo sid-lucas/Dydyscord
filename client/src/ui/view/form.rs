@@ -11,9 +11,12 @@ pub struct FormState {
 pub enum FormKind {
     Login(LoginFormState),
     Signup(SignupFormState),
+    // Future form ici...
 }
 
 impl FormState {
+    // Constructor of a new form :
+
     pub fn login(return_menu: MenuState) -> Self {
         Self {
             return_menu,
