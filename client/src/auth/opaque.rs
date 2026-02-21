@@ -31,11 +31,11 @@ pub struct LoginResult {
     pub session_key: Vec<u8>,
 }
 
-pub fn register(username: &str, password: &str) -> Result<(), AppError> {
+pub fn register(username: &str, password: &[u8]) -> Result<(), AppError> {
     let mut client_rng = OsRng;
 
     // Start client registration with OPAQUE
-    let start = ClientRegistration::<Default>::start(&mut client_rng, &password.as_bytes())
+    let start = ClientRegistration::<Default>::start(&mut client_rng, &password)
         .map_err(|_| AuthError::OpaqueRegisterStart)?;
 
     // Prepare the request to send to the server
@@ -62,7 +62,7 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
         .state
         .finish(
             &mut client_rng,
-            &password.as_bytes(),
+            &password,
             register_response,
             ClientRegistrationFinishParameters::default(),
         )
@@ -81,11 +81,11 @@ pub fn register(username: &str, password: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
+pub fn login(username: &str, password: &[u8]) -> Result<LoginResult, AppError> {
     let mut client_rng = OsRng;
 
     // Start client login with OPAQUE
-    let start = ClientLogin::<Default>::start(&mut client_rng, &password.as_bytes())
+    let start = ClientLogin::<Default>::start(&mut client_rng, &password)
         .map_err(|_| AuthError::OpaqueLoginStart)?;
 
     // Prepare the request to send to the server
@@ -114,7 +114,7 @@ pub fn login(username: &str, password: &str) -> Result<LoginResult, AppError> {
         .state
         .finish(
             &mut client_rng,
-            &password.as_bytes(),
+            &password,
             login_response,
             ClientLoginFinishParameters::default(),
         )

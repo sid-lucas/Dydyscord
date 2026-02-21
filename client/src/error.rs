@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     auth::error::AuthError, mls::error::MlsError, storage::error::StorageError,
-    transport::error::TransportError, ui::cli::error::UiError,
+    transport::error::TransportError,
 };
 
 #[derive(Debug, Error)]
@@ -13,7 +13,6 @@ pub enum AppError {
     Mls(MlsError),
     Storage(StorageError),
     Transport(TransportError),
-    Ui(UiError),
 }
 
 impl From<AuthError> for AppError {
@@ -40,12 +39,6 @@ impl From<TransportError> for AppError {
     }
 }
 
-impl From<UiError> for AppError {
-    fn from(err: UiError) -> Self {
-        AppError::Ui(err)
-    }
-}
-
 impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -53,7 +46,6 @@ impl fmt::Display for AppError {
             AppError::Mls(e) => write!(f, "MLS error: {}", e),
             AppError::Storage(e) => write!(f, "Storage error: {}", e),
             AppError::Transport(e) => write!(f, "Transport error: {}", e),
-            AppError::Ui(e) => write!(f, "UI error: {}", e),
         }
     }
 }
