@@ -76,6 +76,8 @@ pub fn run(state: &mut AppState) {
     let mut stack = vec![Screen::MenuLoggedOut];
 
     loop {
+
+        
         if new_screen {
             //clear_terminal();
             display_header(state);

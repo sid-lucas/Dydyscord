@@ -1,2 +1,2 @@
-pub mod cli;
-pub mod tui;
+pub mod app;
+pub mod chat;
