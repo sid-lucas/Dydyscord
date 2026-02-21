@@ -16,7 +16,6 @@ use crate::transport::api;
 
 // TODO Rename file, does not correspond to what it does
 
-// A helper to create and store credentials.
 fn generate_credential_with_key(
     identity: &str,
 ) -> Result<(CredentialWithKey, SignatureKeyPair), AppError> {
@@ -37,7 +36,6 @@ fn generate_credential_with_key(
     ))
 }
 
-// A helper to create key package bundles.
 fn generate_key_package(
     signer: &SignatureKeyPair,
     credential_with_key: CredentialWithKey,
@@ -172,7 +170,6 @@ pub fn init_group(
 
     // Create the group id (unique)
     let unique_group_id = GroupId::random(provider.rand());
-    // Create the group with the user information.
     let mut new_group = MlsGroup::new_with_group_id(
         provider,
         &signer,
@@ -190,12 +187,10 @@ pub fn init_group(
         .add_members(provider, &signer, &key_packages)
         .map_err(|_| MlsError::AddMembers)?;
 
-    // Apply the pending commit locally to make the group operational.
     new_group
         .merge_pending_commit(provider)
         .map_err(|_| MlsError::MergePendingCommit)?;
 
-    // Serialize the Welcome message so it can be sent to the server for delivery.
     let welcome_bytes = welcome_msg
         .tls_serialize_detached()
         .map_err(|_| MlsError::WelcomeSerialize)?;

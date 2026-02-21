@@ -11,7 +11,6 @@ pub struct FormState {
 pub enum FormKind {
     Login(LoginFormState),
     Signup(SignupFormState),
-    // Future form ici...
 }
 
 impl FormState {

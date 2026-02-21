@@ -64,7 +64,6 @@ fn draw_chat_history(f: &mut Frame, area: Rect, chat: &Chat) {
     }
 
     // Paragraph scroll: (vertical, horizontal)
-    // Scrolling is from the top. We want a scroll from the bottom => compute an offset.
     let inner_height = area.height.saturating_sub(2); // borders
     let total_lines = lines.len() as u16;
 

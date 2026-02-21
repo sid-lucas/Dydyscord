@@ -43,7 +43,6 @@ pub async fn connect_ws(
     session_cookie: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Build request with cookie header
-    // Add Sec-WebSocket-Key, etc.
     let mut req = ws_url.into_client_request()?;
     req.headers_mut().insert(COOKIE, session_cookie.parse()?);
 

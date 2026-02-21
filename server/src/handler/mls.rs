@@ -31,7 +31,6 @@ pub async fn update_key_packages(
                 .map_err(|_| StatusCode::BAD_REQUEST)?;
         }
 
-        // Store only the public KeyPackage bytes (TLS-serialized).
         sqlx::query!(
             r#"INSERT INTO key_packages (device_id, key_package) VALUES ($1, $2)"#,
             device_id,
@@ -52,8 +51,6 @@ pub async fn get_keypackage_from_username(
     // Retrieve username and compute the corresponding login_lookup
     let login_lookup = handler::login_lookup(&state.pepper(), &payload.username);
 
-    // Atomically selects and deletes the oldest key_package per device for the given user, returning the consumed key packages.
-    // Ensures one-time consumption and avoids race conditions.
     let out = sqlx::query_as!(
         DeviceKeyPackage,
         r#"
@@ -141,7 +138,6 @@ pub async fn fetch_welcome(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // If no welcome pending...
     if rows.is_empty() {
         return Ok((StatusCode::OK, Json(vec![])));
     }

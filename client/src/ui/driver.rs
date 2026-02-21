@@ -6,10 +6,12 @@ use std::{
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{Terminal, backend::CrosstermBackend};
 use secrecy::SecretSlice;
+
+use crate::{core, error::AppError, transport::error::TransportError};
 
 use super::{
     app::App,
@@ -18,7 +20,7 @@ use super::{
 };
 
 pub fn run(app: App) -> io::Result<()> {
-    // Boot terminal in raw mode + alternate screen, then run the UI loop.
+    // Start terminal in raw mode and alternate screen then run the UI loop
     let mut terminal = init_terminal()?;
     let mut app = app;
     let res = run_app(&mut terminal, &mut app);
@@ -29,8 +31,8 @@ pub fn run(app: App) -> io::Result<()> {
 // --- Terminal setup/restore ---
 
 fn init_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
-    // Raw mode = direct key input, alternate screen = clean full-screen UI.
-    enable_raw_mode()?;
+    // Raw mode for direct key input and alternate screen for a clean full screen UI
+    crossterm::terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
@@ -38,8 +40,8 @@ fn init_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
 }
 
 fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> io::Result<()> {
-    // Always clean up so the user's terminal is restored on exit.
-    disable_raw_mode()?;
+    // Always clean up so the user terminal is restored on exit
+    crossterm::terminal::disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
     Ok(())
@@ -48,20 +50,20 @@ fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> io::Re
 // --- Runtime loop ---
 
 fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> io::Result<()> {
-    // Basic tick loop: draw, poll for input, update timers.
+    // Basic tick loop draw poll for input update timers
     let tick_rate = Duration::from_millis(100);
     let mut last_tick = Instant::now();
 
     loop {
-        // Advance timers (menu status rotation, etc.).
+        // Advance timers like menu status rotation
         app.tick();
-        // Draw the current frame.
+        // Draw the current frame
         terminal.draw(|f| draw::ui(f, app))?;
 
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
-                // Return true to quit.
+                // Return true to quit
                 if handle_key(app, key) {
                     return Ok(()); // quit
                 }
@@ -69,7 +71,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
         }
 
         if last_tick.elapsed() >= tick_rate {
-            // Time-based updates can hook into this if needed later.
+            // Time based updates can hook into this later
             last_tick = Instant::now();
         }
     }
@@ -148,7 +150,7 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
 }
 
 fn handle_menu_key(app: &mut App, key: KeyEvent) {
-    // Menu input: move selection, enter, or go back.
+    // Menu input move selection enter or go back
     let kind = match &app.view {
         View::Menu(menu) => menu.current().kind,
         _ => return,
@@ -170,7 +172,7 @@ fn handle_menu_key(app: &mut App, key: KeyEvent) {
             KeyCode::PageDown => menu.current_mut().move_selection(5, entries.len()),
             KeyCode::Enter => activate = true,
             KeyCode::Esc | KeyCode::Backspace => {
-                // Back to previous menu; at root it just stays put.
+                // Back to previous menu at root it stays put
                 menu.pop();
             }
             _ => {}
@@ -187,7 +189,7 @@ fn handle_info_key(_app: &mut App, _key: KeyEvent) {}
 fn handle_chat_key(_app: &mut App, _key: KeyEvent) {}
 
 fn handle_login_key(app: &mut App, key: KeyEvent) {
-    // Login form input: username -> password -> submit.
+    // Login form input username then password then submit
     let mut action = LoginAction::None;
 
     {
@@ -224,7 +226,7 @@ fn handle_login_key(app: &mut App, key: KeyEvent) {
                         } else if login.password_is_empty() {
                             *error = Some("Password required.".to_string());
                         } else {
-                            action = LoginAction::Success {
+                            action = LoginAction::Submit {
                                 username: username.to_string(),
                                 password: login.take_password(),
                             };
@@ -257,9 +259,32 @@ fn handle_login_key(app: &mut App, key: KeyEvent) {
         LoginAction::Back(menu) => {
             app.view = View::Menu(menu);
         }
-        LoginAction::Success { username, password } => {
-            app.session = None; //Some(Session::new(username));
-            app.view = View::Menu(MenuState::logged_in());
+        LoginAction::Submit { username, password } => {
+            // Submit credentials to core auth and update UI state based on result
+            match core::auth::perform_login(&username, &password) {
+                Ok(session) => {
+                    app.session = Some(session);
+                    app.view = View::Menu(MenuState::logged_in());
+                }
+                Err(err) => {
+                    // Keep friendly errors for invalid credentials fallback to raw error text
+                    let message = match err {
+                        AppError::Transport(TransportError::LoginFailed)
+                        | AppError::Transport(TransportError::Unauthorized) => {
+                            "Username or password is incorrect.".to_string()
+                        }
+                        _ => err.to_string(),
+                    };
+                    if let View::Form(form) = &mut app.view {
+                        form.error = Some(message);
+                        if let FormKind::Login(login) = &mut form.kind {
+                            // Security and UX clear password and reset focus to the first field
+                            login.clear_password();
+                            login.active = LoginField::Username;
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -267,14 +292,14 @@ fn handle_login_key(app: &mut App, key: KeyEvent) {
 enum LoginAction {
     None,
     Back(MenuState),
-    Success {
+    Submit {
         username: String,
         password: SecretSlice<u8>,
     },
 }
 
 fn handle_signup_key(app: &mut App, key: KeyEvent) {
-    // Signup form input: username -> password -> confirm password -> submit.
+    // Signup form input username then password then confirm password then submit
     let mut action = SignupAction::None;
 
     {

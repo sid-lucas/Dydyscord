@@ -115,7 +115,7 @@ pub fn create_cookie(
 
     Ok(Cookie::build((header, jwt))
         .http_only(false) // TODO change
-        .secure(false) // TODO Change: true forbids sending over HTTP. -> false for local testing for now.
+        .secure(false)
         .same_site(SameSite::Strict)
         .path("/")
         .build())

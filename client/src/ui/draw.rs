@@ -16,7 +16,6 @@ use super::{
 };
 
 pub fn ui(f: &mut Frame, app: &App) {
-    // Router: pick a screen based on the current app view.
     match &app.view {
         View::Menu(menu) => draw_menu(f, app, menu),
         View::Form(form) => match &form.kind {
@@ -29,7 +28,6 @@ pub fn ui(f: &mut Frame, app: &App) {
 }
 
 fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
-    // Menu layout: header, list, and a status line at the bottom.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -70,7 +68,6 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
     let header = Line::from(header_spans);
     f.render_widget(Paragraph::new(Text::from(header)), chunks[0]);
 
-    // Build the list from current menu entries.
     let entries = app.menu_entries(menu.current().kind);
     let items: Vec<ListItem> = entries
         .iter()
@@ -86,7 +83,6 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("▸ ");
 
-    // Keep selection state in sync with menu.
     let mut state = ListState::default();
     if !entries.is_empty() {
         let selected = menu.current().selected.min(entries.len().saturating_sub(1));
@@ -95,7 +91,6 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
 
     f.render_stateful_widget(list, chunks[1], &mut state);
 
-    // Bottom status line: rotates every 2 seconds and stays across menus.
     let status_line = Line::from(vec![
         Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(app.menu_status()),
@@ -105,7 +100,6 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
 }
 
 fn draw_signup_form(f: &mut Frame, form: &FormState, signup: &SignupFormState) {
-    // Login layout: header + form fields.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(3)])
@@ -166,7 +160,6 @@ fn draw_signup_form(f: &mut Frame, form: &FormState, signup: &SignupFormState) {
         .wrap(Wrap { trim: true });
     f.render_widget(paragraph, chunks[1]);
 
-    // Cursor placement: put it at the end of the active field.
     let (label, value_width, row) = match signup.active {
         SignupField::Username => (username_label, signup.username.as_str(), 0u16),
         SignupField::Password => (password_label, password_mask.as_str(), 1u16),
@@ -183,7 +176,6 @@ fn draw_signup_form(f: &mut Frame, form: &FormState, signup: &SignupFormState) {
 }
 
 fn draw_login_form(f: &mut Frame, form: &FormState, login: &LoginFormState) {
-    // Login layout: header + form fields.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(3)])
@@ -234,7 +226,6 @@ fn draw_login_form(f: &mut Frame, form: &FormState, login: &LoginFormState) {
         .wrap(Wrap { trim: true });
     f.render_widget(paragraph, chunks[1]);
 
-    // Cursor placement: put it at the end of the active field.
     let (label, value_width, row) = match login.active {
         LoginField::Username => (username_label, login.username.as_str(), 0u16),
         LoginField::Password => (password_label, password_mask.as_str(), 1u16),
@@ -248,7 +239,6 @@ fn draw_login_form(f: &mut Frame, form: &FormState, login: &LoginFormState) {
 }
 
 fn draw_error(f: &mut Frame, message: &str) {
-    // Fallback view if something goes wrong (e.g., missing room).
     let block = Block::default().title("Erreur").borders(Borders::ALL);
     let paragraph = Paragraph::new(message)
         .block(block)
@@ -257,7 +247,6 @@ fn draw_error(f: &mut Frame, message: &str) {
 }
 
 fn menu_path(menu: &MenuState) -> String {
-    // Build a "Menu > Submenu" breadcrumb path.
     let mut parts = Vec::new();
     for frame in &menu.stack {
         parts.push(frame.kind.title());
@@ -266,7 +255,6 @@ fn menu_path(menu: &MenuState) -> String {
 }
 
 fn draw_chat(f: &mut Frame, chat: &Chat, authenticated: bool) {
-    // Chat layout: header, main area, and input bar.
     // Global layout: top (header) / middle (chat+users) / bottom (input)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -289,7 +277,6 @@ fn draw_header(f: &mut Frame, area: Rect, chat: &Chat, authenticated: bool) {
         "Esc/Ctrl+C: back | ↑↓ PgUp/PgDn: scroll"
     };
 
-    // Header shows room, user, and key hints.
     let title = Line::from(vec![
         Span::styled(
             &chat.room_name,
@@ -314,7 +301,6 @@ fn is_guest_root(menu: &MenuState) -> bool {
 }
 
 fn draw_middle(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Split the middle into chat history and user list.
     // Two columns: chat + users (optional)
     let cols = Layout::default()
         .direction(Direction::Horizontal)
@@ -326,7 +312,6 @@ fn draw_middle(f: &mut Frame, area: Rect, chat: &Chat) {
 }
 
 fn draw_chat_history(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Chat history box with scroll support.
     let block = Block::default().title("History").borders(Borders::ALL);
 
     // Build chat lines
@@ -340,7 +325,6 @@ fn draw_chat_history(f: &mut Frame, area: Rect, chat: &Chat) {
     }
 
     // Paragraph scroll: (vertical, horizontal)
-    // Scrolling is from the top. We want a scroll from the bottom => compute an offset.
     let inner_height = area.height.saturating_sub(2); // borders
     let total_lines = lines.len() as u16;
 
@@ -358,7 +342,6 @@ fn draw_chat_history(f: &mut Frame, area: Rect, chat: &Chat) {
 }
 
 fn draw_users(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Right side: simple list of users, bold for current user.
     let block = Block::default().title("Users").borders(Borders::ALL);
 
     let lines: Vec<Line> = chat
@@ -383,7 +366,6 @@ fn draw_users(f: &mut Frame, area: Rect, chat: &Chat) {
 }
 
 fn draw_input(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Bottom input area + cursor placement.
     let block = Block::default().title("Message").borders(Borders::ALL);
 
     // Render input text
