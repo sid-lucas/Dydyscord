@@ -1,17 +1,11 @@
+use crate::{
+    auth::{self, session::Session},
+    error::AppError,
+    mls, storage,
+};
 use secrecy::{ExposeSecret, SecretSlice};
 
-use crate::{auth, mls, storage};
-use crate::auth::session::Session;
-use crate::error::AppError;
-
-// Register a new user with OPAQUE
-pub fn signup(username: &str, password: &SecretSlice<u8>) -> Result<(), AppError> {
-    auth::opaque::register(username, password.expose_secret())?;
-    Ok(())
-}
-
-// Login and return a fully initialized session
-pub fn login(username: &str, password: &SecretSlice<u8>) -> Result<Session, AppError> {
+pub fn perform_login(username: &str, password: &SecretSlice<u8>) -> Result<Session, AppError> {
     // Retrieve login results and create new session with it if successful
     let mut session = Session::new(auth::opaque::login(username, password.expose_secret())?);
 

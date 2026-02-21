@@ -7,34 +7,24 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
+use crate::ui::app::{SignupField, SignupFormState};
+
 use super::{
-    app::{App, InfoState, LoginField, LoginFormState, MenuPageKind, MenuState, View},
+    app::{App, LoginField, LoginFormState, MenuPageKind, MenuState, View},
     chat::Chat,
 };
 
-// Top-level UI router for the frame
 pub fn ui(f: &mut Frame, app: &App) {
-    // Router that selects the correct UI for the active view
-    match &app.ui.view {
+    // Router: pick a screen based on the current app view.
+    match &app.view {
         View::Menu(menu) => draw_menu(f, app, menu),
-        View::Chat { room_index } => match app.data.rooms.as_ref() {
-            Some(rooms) => {
-                if let Some(room) = rooms.get(*room_index) {
-                    draw_chat(f, &room.chat);
-                } else {
-                    draw_error(f, "Chatroom not found.");
-                }
-            }
-            None => draw_error(f, "No chatrooms found."),
-        },
-        View::Info(info) => draw_info(f, info),
         View::Login(form) => draw_login_form(f, form),
+        View::Signup(form) => draw_signup_form(f, form),
     }
 }
 
-// Render the main menu view
 fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
-    // Menu layout: header, list, and a status line at the bottom
+    // Menu layout: header, list, and a status line at the bottom.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -44,31 +34,38 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
         ])
         .split(f.size());
 
-    let nav_hint = if is_guest_root(menu) {
-        "Enter: select | Esc/Ctrl+C: quit"
-    } else if is_authed_root(menu) {
-        "Enter: select | Esc/Ctrl+C: logout"
+    let nav_hint = if app.session.is_some() {
+        if menu.stack.len() > 1 {
+            "Enter: select | Esc/Ctrl+C: back"
+        } else {
+            "Enter: select | Esc/Ctrl+C: logout"
+        }
     } else {
-        "Enter: select | Esc/Ctrl+C: back"
+        "Enter: select | Esc/Ctrl+C: quit"
     };
 
     // Header shows the navigation path + user + shortcuts
     let path = menu_path(menu);
-    let username = match app.auth.session.as_ref() {
-        Some(session) => session.username(),
-        None => "Guest",
-    };
-    let header = Line::from(vec![
+    let mut header_spans = vec![
         Span::styled(path, Style::default().add_modifier(Modifier::BOLD)),
         Span::raw("   "),
-        Span::raw("User: "),
-        Span::styled(username, Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("   "),
-        Span::raw(nav_hint),
-    ]);
+    ];
+
+    if let Some(session) = app.session.as_ref() {
+        header_spans.push(Span::raw("User: "));
+        header_spans.push(Span::styled(
+            session.username(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ));
+        header_spans.push(Span::raw("   "));
+    }
+
+    header_spans.push(Span::raw(nav_hint));
+
+    let header = Line::from(header_spans);
     f.render_widget(Paragraph::new(Text::from(header)), chunks[0]);
 
-    // Build the list from current menu entries
+    // Build the list from current menu entries.
     let entries = app.menu_entries(menu.current().kind);
     let items: Vec<ListItem> = entries
         .iter()
@@ -84,7 +81,7 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("▸ ");
 
-    // Keep selection state in sync with menu
+    // Keep selection state in sync with menu.
     let mut state = ListState::default();
     if !entries.is_empty() {
         let selected = menu.current().selected.min(entries.len().saturating_sub(1));
@@ -93,7 +90,7 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
 
     f.render_stateful_widget(list, chunks[1], &mut state);
 
-    // Bottom status line: rotates every 2 seconds and stays across menus
+    // Bottom status line: rotates every 2 seconds and stays across menus.
     let status_line = Line::from(vec![
         Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(app.menu_status()),
@@ -102,40 +99,86 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
     f.render_widget(status, chunks[2]);
 }
 
-// Render an info panel view
-fn draw_info(f: &mut Frame, info: &InfoState) {
-    // Info layout is simple: header + text body
+fn draw_signup_form(f: &mut Frame, form: &SignupFormState) {
+    // Login layout: header + form fields.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(3)])
         .split(f.size());
 
-    // Title + back hints
-    let hint = "Esc/Ctrl+C: back";
     let header = Line::from(vec![
-        Span::styled(&info.title, Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled("Sign up", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw("   "),
-        Span::raw(hint),
+        Span::raw("Enter: next/submit | Esc/Ctrl+C: back"),
     ]);
     f.render_widget(Paragraph::new(Text::from(header)), chunks[0]);
 
-    // Convert body lines into ratatui Text
-    let lines: Vec<Line> = info
-        .body
-        .iter()
-        .map(|line| Line::from(line.as_str()))
-        .collect();
+    let username_label = "Username: ";
+    let password_label = "Password: ";
+    let confirm_password_label = "Confirm Password: ";
+    let password_mask = "*".repeat(form.password.expose_secret().len());
+    let confirm_password_mask = "*".repeat(form.confirm_password.expose_secret().len());
 
-    let block = Block::default().title("Info").borders(Borders::ALL);
+    let username_style = if form.active == SignupField::Username {
+        Style::default().add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let password_style = if form.active == SignupField::Password {
+        Style::default().add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let confirm_password_style = if form.active == SignupField::ConfirmPassword {
+        Style::default().add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+
+    let mut lines = Vec::new();
+    lines.push(Line::from(vec![
+        Span::styled(username_label, username_style),
+        Span::raw(form.username.clone()),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled(password_label, password_style),
+        Span::raw(password_mask.as_str()),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled(confirm_password_label, confirm_password_style),
+        Span::raw(confirm_password_mask.as_str()),
+    ]));
+    if let Some(error) = &form.error {
+        lines.push(Line::from(vec![
+            Span::styled("Error: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(error.clone()),
+        ]));
+    }
+
+    let block = Block::default().title("Credentials").borders(Borders::ALL);
     let paragraph = Paragraph::new(Text::from(lines))
         .block(block)
         .wrap(Wrap { trim: true });
     f.render_widget(paragraph, chunks[1]);
+
+    // Cursor placement: put it at the end of the active field.
+    let (label, value_width, row) = match form.active {
+        SignupField::Username => (username_label, form.username.as_str(), 0u16),
+        SignupField::Password => (password_label, password_mask.as_str(), 1u16),
+        SignupField::ConfirmPassword => {
+            (confirm_password_label, confirm_password_mask.as_str(), 2u16)
+        }
+    };
+    let x = chunks[1].x
+        + 1
+        + UnicodeWidthStr::width(label) as u16
+        + UnicodeWidthStr::width(value_width) as u16;
+    let y = chunks[1].y + 1 + row;
+    f.set_cursor(x, y);
 }
 
-// Render the login form view
 fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
-    // Login layout: header + form fields
+    // Login layout: header + form fields.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(3)])
@@ -144,13 +187,13 @@ fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
     let header = Line::from(vec![
         Span::styled("Log In", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw("   "),
-        Span::raw("Enter: next/submit | Esc/Ctrl+C: cancel"),
+        Span::raw("Enter: next/submit | Esc/Ctrl+C: back"),
     ]);
     f.render_widget(Paragraph::new(Text::from(header)), chunks[0]);
 
     let username_label = "Username: ";
     let password_label = "Password: ";
-    let password_mask = "*".repeat(form.password_len());
+    let password_mask = "*".repeat(form.password.chars().count());
 
     let username_style = if form.active == LoginField::Username {
         Style::default().add_modifier(Modifier::BOLD)
@@ -186,7 +229,7 @@ fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
         .wrap(Wrap { trim: true });
     f.render_widget(paragraph, chunks[1]);
 
-    // Cursor placement: put it at the end of the active field
+    // Cursor placement: put it at the end of the active field.
     let (label, value_width, row) = match form.active {
         LoginField::Username => (username_label, form.username.as_str(), 0u16),
         LoginField::Password => (password_label, password_mask.as_str(), 1u16),
@@ -199,9 +242,8 @@ fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
     f.set_cursor(x, y);
 }
 
-// Render a fallback error view
 fn draw_error(f: &mut Frame, message: &str) {
-    // Fallback view if something goes wrong (e.g., missing room)
+    // Fallback view if something goes wrong (e.g., missing room).
     let block = Block::default().title("Erreur").borders(Borders::ALL);
     let paragraph = Paragraph::new(message)
         .block(block)
@@ -209,9 +251,8 @@ fn draw_error(f: &mut Frame, message: &str) {
     f.render_widget(paragraph, f.size());
 }
 
-// Build a user-friendly menu breadcrumb path
 fn menu_path(menu: &MenuState) -> String {
-    // Build a "Menu > Submenu" breadcrumb path
+    // Build a "Menu > Submenu" breadcrumb path.
     let mut parts = Vec::new();
     for frame in &menu.stack {
         parts.push(frame.kind.title());
@@ -219,9 +260,8 @@ fn menu_path(menu: &MenuState) -> String {
     parts.join(" > ")
 }
 
-// Render the chatroom view
-fn draw_chat(f: &mut Frame, chat: &Chat) {
-    // Chat layout: header, main area, and input bar
+fn draw_chat(f: &mut Frame, chat: &Chat, authenticated: bool) {
+    // Chat layout: header, main area, and input bar.
     // Global layout: top (header) / middle (chat+users) / bottom (input)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -232,16 +272,19 @@ fn draw_chat(f: &mut Frame, chat: &Chat) {
         ])
         .split(f.size());
 
-    draw_header(f, chunks[0], chat);
+    draw_header(f, chunks[0], chat, authenticated);
     draw_middle(f, chunks[1], chat);
     draw_input(f, chunks[2], chat);
 }
 
-// Render the chat header area
-fn draw_header(f: &mut Frame, area: Rect, chat: &Chat) {
-    let hint = "Esc/Ctrl+C: back | ↑↓ PgUp/PgDn: scroll";
+fn draw_header(f: &mut Frame, area: Rect, chat: &Chat, authenticated: bool) {
+    let hint = if authenticated {
+        "Esc/Ctrl+C: logout | ↑↓ PgUp/PgDn: scroll"
+    } else {
+        "Esc/Ctrl+C: back | ↑↓ PgUp/PgDn: scroll"
+    };
 
-    // Header shows room, user, and key hints
+    // Header shows room, user, and key hints.
     let title = Line::from(vec![
         Span::styled(
             &chat.room_name,
@@ -261,19 +304,12 @@ fn draw_header(f: &mut Frame, area: Rect, chat: &Chat) {
     f.render_widget(header, area);
 }
 
-// Check if the current menu is the guest root
 fn is_guest_root(menu: &MenuState) -> bool {
-    menu.stack.len() == 1 && matches!(menu.current().kind, MenuPageKind::RootGuest)
+    menu.stack.len() == 1 && matches!(menu.current().kind, MenuPageKind::LoggedOut)
 }
 
-// Check if the current menu is the authenticated root
-fn is_authed_root(menu: &MenuState) -> bool {
-    menu.stack.len() == 1 && matches!(menu.current().kind, MenuPageKind::RootAuthed)
-}
-
-// Render the middle chat area that contains history and users
 fn draw_middle(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Split the middle into chat history and user list
+    // Split the middle into chat history and user list.
     // Two columns: chat + users (optional)
     let cols = Layout::default()
         .direction(Direction::Horizontal)
@@ -284,9 +320,8 @@ fn draw_middle(f: &mut Frame, area: Rect, chat: &Chat) {
     draw_users(f, cols[1], chat);
 }
 
-// Render the chat history list with scrolling
 fn draw_chat_history(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Chat history box with scroll support
+    // Chat history box with scroll support.
     let block = Block::default().title("History").borders(Borders::ALL);
 
     // Build chat lines
@@ -300,7 +335,7 @@ fn draw_chat_history(f: &mut Frame, area: Rect, chat: &Chat) {
     }
 
     // Paragraph scroll: (vertical, horizontal)
-    // Scrolling is from the top. We want a scroll from the bottom => compute an offset
+    // Scrolling is from the top. We want a scroll from the bottom => compute an offset.
     let inner_height = area.height.saturating_sub(2); // borders
     let total_lines = lines.len() as u16;
 
@@ -317,9 +352,8 @@ fn draw_chat_history(f: &mut Frame, area: Rect, chat: &Chat) {
     f.render_widget(paragraph, area);
 }
 
-// Render the user list sidebar
 fn draw_users(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Right side: simple list of users, bold for current user
+    // Right side: simple list of users, bold for current user.
     let block = Block::default().title("Users").borders(Borders::ALL);
 
     let lines: Vec<Line> = chat
@@ -343,9 +377,8 @@ fn draw_users(f: &mut Frame, area: Rect, chat: &Chat) {
     f.render_widget(paragraph, area);
 }
 
-// Render the input box and cursor
 fn draw_input(f: &mut Frame, area: Rect, chat: &Chat) {
-    // Bottom input area + cursor placement
+    // Bottom input area + cursor placement.
     let block = Block::default().title("Message").borders(Borders::ALL);
 
     // Render input text
