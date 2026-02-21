@@ -10,8 +10,8 @@ use unicode_width::UnicodeWidthStr;
 use super::{
     app::App,
     view::{
-        Chat, LoginField, LoginFormState, MenuPageKind, MenuState, SignupField, SignupFormState,
-        View,
+        Chat, FormKind, FormState, LoginField, LoginFormState, MenuPageKind, MenuState,
+        SignupField, SignupFormState, View,
     },
 };
 
@@ -19,8 +19,12 @@ pub fn ui(f: &mut Frame, app: &App) {
     // Router: pick a screen based on the current app view.
     match &app.view {
         View::Menu(menu) => draw_menu(f, app, menu),
-        View::Login(form) => draw_login_form(f, form),
-        View::Signup(form) => draw_signup_form(f, form),
+        View::Form(form) => match &form.kind {
+            FormKind::Login(login) => draw_login_form(f, form, login),
+            FormKind::Signup(signup) => draw_signup_form(f, form, signup),
+        },
+        View::Info(_) => draw_error(f, "Info view not implemented yet."),
+        View::Chat(_) => draw_error(f, "Chat view not implemented yet."),
     }
 }
 
@@ -100,7 +104,7 @@ fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
     f.render_widget(status, chunks[2]);
 }
 
-fn draw_signup_form(f: &mut Frame, form: &SignupFormState) {
+fn draw_signup_form(f: &mut Frame, form: &FormState, signup: &SignupFormState) {
     // Login layout: header + form fields.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -117,20 +121,20 @@ fn draw_signup_form(f: &mut Frame, form: &SignupFormState) {
     let username_label = "Username: ";
     let password_label = "Password: ";
     let confirm_password_label = "Confirm Password: ";
-    let password_mask = "*".repeat(form.password_len());
-    let confirm_password_mask = "*".repeat(form.confirm_len());
+    let password_mask = "*".repeat(signup.password_len());
+    let confirm_password_mask = "*".repeat(signup.confirm_len());
 
-    let username_style = if form.active == SignupField::Username {
+    let username_style = if signup.active == SignupField::Username {
         Style::default().add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let password_style = if form.active == SignupField::Password {
+    let password_style = if signup.active == SignupField::Password {
         Style::default().add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let confirm_password_style = if form.active == SignupField::ConfirmPassword {
+    let confirm_password_style = if signup.active == SignupField::ConfirmPassword {
         Style::default().add_modifier(Modifier::BOLD)
     } else {
         Style::default()
@@ -139,7 +143,7 @@ fn draw_signup_form(f: &mut Frame, form: &SignupFormState) {
     let mut lines = Vec::new();
     lines.push(Line::from(vec![
         Span::styled(username_label, username_style),
-        Span::raw(form.username.clone()),
+        Span::raw(signup.username.clone()),
     ]));
     lines.push(Line::from(vec![
         Span::styled(password_label, password_style),
@@ -163,8 +167,8 @@ fn draw_signup_form(f: &mut Frame, form: &SignupFormState) {
     f.render_widget(paragraph, chunks[1]);
 
     // Cursor placement: put it at the end of the active field.
-    let (label, value_width, row) = match form.active {
-        SignupField::Username => (username_label, form.username.as_str(), 0u16),
+    let (label, value_width, row) = match signup.active {
+        SignupField::Username => (username_label, signup.username.as_str(), 0u16),
         SignupField::Password => (password_label, password_mask.as_str(), 1u16),
         SignupField::ConfirmPassword => {
             (confirm_password_label, confirm_password_mask.as_str(), 2u16)
@@ -178,7 +182,7 @@ fn draw_signup_form(f: &mut Frame, form: &SignupFormState) {
     f.set_cursor(x, y);
 }
 
-fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
+fn draw_login_form(f: &mut Frame, form: &FormState, login: &LoginFormState) {
     // Login layout: header + form fields.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -194,14 +198,14 @@ fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
 
     let username_label = "Username: ";
     let password_label = "Password: ";
-    let password_mask = "*".repeat(form.password_len());
+    let password_mask = "*".repeat(login.password_len());
 
-    let username_style = if form.active == LoginField::Username {
+    let username_style = if login.active == LoginField::Username {
         Style::default().add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let password_style = if form.active == LoginField::Password {
+    let password_style = if login.active == LoginField::Password {
         Style::default().add_modifier(Modifier::BOLD)
     } else {
         Style::default()
@@ -210,7 +214,7 @@ fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
     let mut lines = Vec::new();
     lines.push(Line::from(vec![
         Span::styled(username_label, username_style),
-        Span::raw(form.username.clone()),
+        Span::raw(login.username.clone()),
     ]));
     lines.push(Line::from(vec![
         Span::styled(password_label, password_style),
@@ -231,8 +235,8 @@ fn draw_login_form(f: &mut Frame, form: &LoginFormState) {
     f.render_widget(paragraph, chunks[1]);
 
     // Cursor placement: put it at the end of the active field.
-    let (label, value_width, row) = match form.active {
-        LoginField::Username => (username_label, form.username.as_str(), 0u16),
+    let (label, value_width, row) = match login.active {
+        LoginField::Username => (username_label, login.username.as_str(), 0u16),
         LoginField::Password => (password_label, password_mask.as_str(), 1u16),
     };
     let x = chunks[1].x

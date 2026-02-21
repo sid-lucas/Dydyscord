@@ -2,27 +2,57 @@ use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretSlice};
 
 use super::menu::MenuState;
 
-pub struct LoginFormState {
-    // Username input.
-    pub username: String,
-    // Password input (stored raw; masked in the UI).
-    pub password: SecretBox<Vec<u8>>,
-    // Which field is currently active.
-    pub active: LoginField,
-    // Error message shown under the form.
-    pub error: Option<String>,
-    // Snapshot of menu state for the "back" action.
+pub struct FormState {
     pub return_menu: MenuState,
+    pub error: Option<String>,
+    pub kind: FormKind,
+}
+
+pub enum FormKind {
+    Login(LoginFormState),
+    Signup(SignupFormState),
+}
+
+impl FormState {
+    pub fn login(return_menu: MenuState) -> Self {
+        Self {
+            return_menu,
+            error: None,
+            kind: FormKind::Login(LoginFormState::new()),
+        }
+    }
+
+    pub fn signup(return_menu: MenuState) -> Self {
+        Self {
+            return_menu,
+            error: None,
+            kind: FormKind::Signup(SignupFormState::new()),
+        }
+    }
+}
+
+// ========================================
+// Log In
+// ========================================
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LoginField {
+    Username,
+    Password,
+}
+
+pub struct LoginFormState {
+    pub username: String,
+    pub password: SecretBox<Vec<u8>>,
+    pub active: LoginField,
 }
 
 impl LoginFormState {
-    pub fn new(return_menu: MenuState) -> Self {
+    pub fn new() -> Self {
         Self {
             username: String::new(),
             password: SecretBox::new(Box::new(Vec::new())),
             active: LoginField::Username,
-            error: None,
-            return_menu,
         }
     }
     // Count password characters for masking
@@ -70,30 +100,31 @@ impl LoginFormState {
     }
 }
 
+// ========================================
+// Sign Up
+// ========================================
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SignupField {
+    Username,
+    Password,
+    ConfirmPassword,
+}
+
 pub struct SignupFormState {
-    // Username input.
     pub username: String,
-    // Password input (stored raw; masked in the UI).
     pub password: SecretBox<Vec<u8>>,
-    // Confirm password input (stored raw; masked in the UI).
     pub confirm_password: SecretBox<Vec<u8>>,
-    // Which field is currently active.
     pub active: SignupField,
-    // Error message shown under the form.
-    pub error: Option<String>,
-    // Snapshot of menu state for the "back" action.
-    pub return_menu: MenuState,
 }
 
 impl SignupFormState {
-    pub fn new(return_menu: MenuState) -> Self {
+    pub fn new() -> Self {
         Self {
             username: String::new(),
             password: SecretBox::new(Box::new(Vec::new())),
             confirm_password: SecretBox::new(Box::new(Vec::new())),
             active: SignupField::Username,
-            error: None,
-            return_menu,
         }
     }
     // TODO: factoriser avec confirm_password_len ET polymorphiser avec LoginFormState::password_len
@@ -183,17 +214,4 @@ impl SignupFormState {
         let bytes = std::mem::take(self.password.expose_secret_mut());
         SecretSlice::from(bytes)
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LoginField {
-    Username,
-    Password,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SignupField {
-    Username,
-    Password,
-    ConfirmPassword,
 }

@@ -2,9 +2,7 @@ use std::time::{Duration, Instant};
 
 use crate::{auth::session::Session, config::constant};
 
-use super::view::{
-    LoginFormState, MenuAction, MenuEntry, MenuPageKind, MenuState, SignupFormState, View,
-};
+use super::view::{FormState, MenuAction, MenuEntry, MenuPageKind, MenuState, View};
 
 // How often the menu status line rotates.
 const STATUS_ROTATE_EVERY: Duration = Duration::from_secs(2);
@@ -127,7 +125,7 @@ impl App {
                     View::Menu(menu) => menu.clone(),
                     _ => MenuState::logged_out(),
                 };
-                self.view = View::Signup(SignupFormState::new(return_menu));
+                self.view = View::Form(FormState::signup(return_menu));
             }
             MenuAction::Login => {
                 // Open the login form, with the current menu as the return target.
@@ -135,7 +133,7 @@ impl App {
                     View::Menu(menu) => menu.clone(),
                     _ => MenuState::logged_out(),
                 };
-                self.view = View::Login(LoginFormState::new(return_menu));
+                self.view = View::Form(FormState::login(return_menu));
             }
             MenuAction::Back => {
                 // Back pops the menu stack; at root it just stays put.

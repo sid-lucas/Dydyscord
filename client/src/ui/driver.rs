@@ -14,7 +14,7 @@ use secrecy::SecretSlice;
 use super::{
     app::App,
     draw,
-    view::{LoginField, MenuPageKind, MenuState, SignupField, View},
+    view::{FormKind, LoginField, MenuPageKind, MenuState, SignupField, View},
 };
 
 pub fn run(app: App) -> io::Result<()> {
@@ -99,8 +99,16 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     ExitAction::Logout
                 }
             }
-            View::Login(form) => ExitAction::ReturnToMenu(form.return_menu.clone()),
-            View::Signup(form) => ExitAction::ReturnToMenu(form.return_menu.clone()),
+            View::Form(form) => ExitAction::ReturnToMenu(form.return_menu.clone()),
+            View::Info(info) => ExitAction::ReturnToMenu(info.return_menu.clone()),
+            View::Chat(_) => {
+                let menu = if app.session.is_some() {
+                    MenuState::logged_in()
+                } else {
+                    MenuState::logged_out()
+                };
+                ExitAction::ReturnToMenu(menu)
+            }
         };
 
         match action {
@@ -127,8 +135,12 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
 
     let handler: fn(&mut App, KeyEvent) = match &app.view {
         View::Menu(_) => handle_menu_key,
-        View::Login(_) => handle_login_key,
-        View::Signup(_) => handle_signup_key,
+        View::Form(form) => match &form.kind {
+            FormKind::Login(_) => handle_login_key,
+            FormKind::Signup(_) => handle_signup_key,
+        },
+        View::Info(_) => handle_info_key,
+        View::Chat(_) => handle_chat_key,
     };
     handler(app, key);
 
@@ -170,59 +182,69 @@ fn handle_menu_key(app: &mut App, key: KeyEvent) {
     }
 }
 
+fn handle_info_key(_app: &mut App, _key: KeyEvent) {}
+
+fn handle_chat_key(_app: &mut App, _key: KeyEvent) {}
+
 fn handle_login_key(app: &mut App, key: KeyEvent) {
     // Login form input: username -> password -> submit.
     let mut action = LoginAction::None;
 
     {
         let form = match &mut app.view {
-            View::Login(form) => form,
+            View::Form(form) => form,
+            _ => return,
+        };
+        let return_menu = form.return_menu.clone();
+        let error = &mut form.error;
+        let login = match &mut form.kind {
+            FormKind::Login(login) => login,
             _ => return,
         };
 
         match key.code {
             KeyCode::Esc => {
-                action = LoginAction::Back(form.return_menu.clone());
+                action = LoginAction::Back(return_menu);
             }
             KeyCode::Enter => {
-                form.error = None;
-                match form.active {
+                *error = None;
+                match login.active {
                     LoginField::Username => {
-                        if form.username.trim().is_empty() {
-                            form.error = Some("Username required.".to_string());
+                        if login.username.trim().is_empty() {
+                            *error = Some("Username required.".to_string());
                         } else {
-                            form.active = LoginField::Password;
+                            login.active = LoginField::Password;
                         }
                     }
                     LoginField::Password => {
-                        let username = form.username.trim();
+                        let username = login.username.trim();
                         if username.is_empty() {
-                            form.error = Some("Username required.".to_string());
-                            form.active = LoginField::Username;
-                        } else if form.password_is_empty() {
-                            form.error = Some("Password required.".to_string());
+                            *error = Some("Username required.".to_string());
+                            login.active = LoginField::Username;
+                        } else if login.password_is_empty() {
+                            *error = Some("Password required.".to_string());
                         } else {
                             action = LoginAction::Success {
                                 username: username.to_string(),
-                                password: form.take_password(),
+                                password: login.take_password(),
                             };
                         }
                     }
                 }
             }
-            KeyCode::Backspace => match form.active {
+            KeyCode::Backspace => match login.active {
                 LoginField::Username => {
-                    form.username.pop();
+                    login.username.pop();
                 }
                 LoginField::Password => {
-                    form.pop_password_char();
+                    login.pop_password_char();
                 }
             },
             KeyCode::Char(ch) => {
                 if !key.modifiers.contains(KeyModifiers::CONTROL) {
-                    match form.active {
-                        LoginField::Username => form.username.push(ch),
-                        LoginField::Password => form.push_password_char(ch),
+                    match login.active {
+                        LoginField::Username => login.username.push(ch),
+                        LoginField::Password => login.push_password_char(ch),
                     }
                 }
             }
@@ -257,64 +279,70 @@ fn handle_signup_key(app: &mut App, key: KeyEvent) {
 
     {
         let form = match &mut app.view {
-            View::Signup(form) => form,
+            View::Form(form) => form,
+            _ => return,
+        };
+        let return_menu = form.return_menu.clone();
+        let error = &mut form.error;
+        let signup = match &mut form.kind {
+            FormKind::Signup(signup) => signup,
             _ => return,
         };
 
         match key.code {
             KeyCode::Esc => {
-                action = SignupAction::Back(form.return_menu.clone());
+                action = SignupAction::Back(return_menu);
             }
             KeyCode::Enter => {
-                form.error = None;
-                match form.active {
+                *error = None;
+                match signup.active {
                     SignupField::Username => {
-                        if form.username.trim().is_empty() {
-                            form.error = Some("Username required.".to_string());
+                        if signup.username.trim().is_empty() {
+                            *error = Some("Username required.".to_string());
                         } else {
-                            form.active = SignupField::Password;
+                            signup.active = SignupField::Password;
                         }
                     }
                     SignupField::Password => {
-                        if form.password_is_empty() {
-                            form.error = Some("Password required.".to_string());
+                        if signup.password_is_empty() {
+                            *error = Some("Password required.".to_string());
                         } else {
-                            form.active = SignupField::ConfirmPassword;
+                            signup.active = SignupField::ConfirmPassword;
                         }
                     }
                     SignupField::ConfirmPassword => {
-                        if form.confirm_is_empty() {
-                            form.error = Some("Confirm password required.".to_string());
-                        } else if !form.passwords_match() {
-                            form.error = Some("Passwords do not match.".to_string());
-                            form.clear_passwords();
-                            form.active = SignupField::Password;
+                        if signup.confirm_is_empty() {
+                            *error = Some("Confirm password required.".to_string());
+                        } else if !signup.passwords_match() {
+                            *error = Some("Passwords do not match.".to_string());
+                            signup.clear_passwords();
+                            signup.active = SignupField::Password;
                         } else {
                             action = SignupAction::Success {
-                                username: form.username.trim().to_string(),
-                                password: form.take_password(),
+                                username: signup.username.trim().to_string(),
+                                password: signup.take_password(),
                             };
                         }
                     }
                 }
             }
-            KeyCode::Backspace => match form.active {
+            KeyCode::Backspace => match signup.active {
                 SignupField::Username => {
-                    form.username.pop();
+                    signup.username.pop();
                 }
                 SignupField::Password => {
-                    form.pop_password_char();
+                    signup.pop_password_char();
                 }
                 SignupField::ConfirmPassword => {
-                    form.pop_confirm_char();
+                    signup.pop_confirm_char();
                 }
             },
             KeyCode::Char(ch) => {
                 if !key.modifiers.contains(KeyModifiers::CONTROL) {
-                    match form.active {
-                        SignupField::Username => form.username.push(ch),
-                        SignupField::Password => form.push_password_char(ch),
-                        SignupField::ConfirmPassword => form.push_confirm_char(ch),
+                    match signup.active {
+                        SignupField::Username => signup.username.push(ch),
+                        SignupField::Password => signup.push_password_char(ch),
+                        SignupField::ConfirmPassword => signup.push_confirm_char(ch),
                     }
                 }
             }
