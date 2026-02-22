@@ -10,6 +10,7 @@ use opaque_ke::{
     ClientRegistrationFinishParameters, CredentialResponse, RegistrationResponse,
 };
 use rand::rngs::OsRng;
+use secrecy::{ExposeSecret, SecretSlice};
 use uuid::Uuid;
 
 use crate::auth::error::AuthError;
@@ -27,15 +28,15 @@ impl CipherSuite for OpaqueCipherSuite {
 pub struct LoginResult {
     pub username: String,
     pub id: Uuid,
-    pub export_key: Vec<u8>, // TODO REVIEW with SecretSlice<u8>
-    pub session_key: Vec<u8>,
+    pub export_key: SecretSlice<u8>, // TODO REVIEW with SecretSlice<u8>
+    pub session_key: SecretSlice<u8>,
 }
 
-pub fn register(username: &str, password: &[u8]) -> Result<(), AppError> {
+pub fn register(username: &str, password: &SecretSlice<u8>) -> Result<(), AppError> {
     let mut client_rng = OsRng;
 
     // Start client registration with OPAQUE
-    let start = ClientRegistration::<Default>::start(&mut client_rng, &password)
+    let start = ClientRegistration::<Default>::start(&mut client_rng, password.expose_secret())
         .map_err(|_| AuthError::OpaqueRegisterStart)?;
 
     // Prepare the request to send to the server
@@ -62,7 +63,7 @@ pub fn register(username: &str, password: &[u8]) -> Result<(), AppError> {
         .state
         .finish(
             &mut client_rng,
-            &password,
+            password.expose_secret(),
             register_response,
             ClientRegistrationFinishParameters::default(),
         )
@@ -81,11 +82,11 @@ pub fn register(username: &str, password: &[u8]) -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn login(username: &str, password: &[u8]) -> Result<LoginResult, AppError> {
+pub fn login(username: &str, password: &SecretSlice<u8>) -> Result<LoginResult, AppError> {
     let mut client_rng = OsRng;
 
     // Start client login with OPAQUE
-    let start = ClientLogin::<Default>::start(&mut client_rng, &password)
+    let start = ClientLogin::<Default>::start(&mut client_rng, password.expose_secret())
         .map_err(|_| AuthError::OpaqueLoginStart)?;
 
     // Prepare the request to send to the server
@@ -114,14 +115,14 @@ pub fn login(username: &str, password: &[u8]) -> Result<LoginResult, AppError> {
         .state
         .finish(
             &mut client_rng,
-            &password,
+            password.expose_secret(),
             login_response,
             ClientLoginFinishParameters::default(),
         )
         .map_err(|_| AuthError::OpaqueLoginFinish)?;
 
-    let export_key = finish.export_key.to_vec();
-    let session_key = finish.session_key.to_vec();
+    let export_key: SecretSlice<u8> = finish.export_key.to_vec().into();
+    let session_key: SecretSlice<u8> = finish.session_key.to_vec().into();
 
     // Prepare the request to send to the server+
     let finish_login_request =

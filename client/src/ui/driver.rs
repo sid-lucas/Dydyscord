@@ -343,7 +343,7 @@ fn handle_signup_key(app: &mut App, key: KeyEvent) {
                             signup.clear_passwords();
                             signup.active = SignupField::Password;
                         } else {
-                            action = SignupAction::Success {
+                            action = SignupAction::Submit {
                                 username: signup.username.trim().to_string(),
                                 password: signup.take_password(),
                             };
@@ -380,9 +380,19 @@ fn handle_signup_key(app: &mut App, key: KeyEvent) {
         SignupAction::Back(menu) => {
             app.view = View::Menu(menu);
         }
-        SignupAction::Success { username, password } => {
-            app.session = None; //Some(Session::new(username));
-            app.view = View::Menu(MenuState::logged_out());
+        SignupAction::Submit { username, password } => {
+            match core::auth::perform_signup(&username, &password) {
+                Ok(_) => {
+                    // TODO REMOVE :
+                    //app.session = Some(session);
+                    //app.view = View::Menu(MenuState::logged_in());
+                    // TODO: PROCEED LE SIGNUP
+                }
+                Err(err) => {
+                    // TODO : Handle signup error
+                    // Regarder comment on a fait sur handle_login_key()
+                }
+            }
         }
     }
 }
@@ -390,7 +400,7 @@ fn handle_signup_key(app: &mut App, key: KeyEvent) {
 enum SignupAction {
     None,
     Back(MenuState),
-    Success {
+    Submit {
         username: String,
         password: SecretSlice<u8>,
     },

@@ -1,13 +1,14 @@
+use secrecy::SecretSlice;
+
 use crate::{
     auth::{self, session::Session},
     error::AppError,
     mls, storage,
 };
-use secrecy::{ExposeSecret, SecretSlice};
 
 pub fn perform_login(username: &str, password: &SecretSlice<u8>) -> Result<Session, AppError> {
     // Retrieve login results and create new session with it if successful
-    let mut session = Session::new(auth::opaque::login(username, password.expose_secret())?);
+    let mut session = Session::new(auth::opaque::login(username, password)?);
 
     // Init local storage and get final token (session token)
     let (device_id, db_key, is_new_device) =
@@ -31,4 +32,12 @@ pub fn perform_login(username: &str, password: &SecretSlice<u8>) -> Result<Sessi
     );
 
     Ok(session)
+}
+
+pub fn perform_signup(username: &str, password: &SecretSlice<u8>) -> Result<(), AppError> {
+    // Try to register with OPAQUE
+    auth::opaque::register(&username, password)?;
+
+    // Go back to main menu
+    Ok(())
 }
