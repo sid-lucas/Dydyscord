@@ -141,6 +141,13 @@ impl MenuEntry {
             action: MenuAction::Logout,
         }
     }
+
+    pub(crate) fn group_create(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            action: MenuAction::GroupCreate,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -151,4 +158,5 @@ pub enum MenuAction {
     Logout,
     Quit,
     Back,
+    GroupCreate,
 }

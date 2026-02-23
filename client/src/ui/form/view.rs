@@ -11,6 +11,7 @@ pub struct FormState {
 pub enum FormKind {
     Login(LoginFormState),
     Signup(SignupFormState),
+    GroupCreate(GroupCreateFormState),
 }
 
 impl FormState {
@@ -29,6 +30,14 @@ impl FormState {
             return_menu,
             error: None,
             kind: FormKind::Signup(SignupFormState::new()),
+        }
+    }
+
+    pub fn group_create(return_menu: MenuState) -> Self {
+        Self {
+            return_menu,
+            error: None,
+            kind: FormKind::GroupCreate(GroupCreateFormState::new()),
         }
     }
 }
@@ -198,5 +207,28 @@ impl SignupFormState {
 
     pub fn take_password(&mut self) -> SecretSlice<u8> {
         secret_take(&mut self.password)
+    }
+}
+
+// ========================================
+// Form: Log In
+// ========================================
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GroupCreateField {
+    Groupname,
+}
+
+pub struct GroupCreateFormState {
+    pub groupname: String,
+    pub active: GroupCreateField,
+}
+
+impl GroupCreateFormState {
+    pub fn new() -> Self {
+        Self {
+            groupname: String::new(),
+            active: GroupCreateField::Groupname,
+        }
     }
 }

@@ -2,13 +2,17 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use secrecy::SecretSlice;
 
 use crate::core;
-use crate::ui::form::view::SignupField;
+use crate::ui::form::view::{GroupCreateField, SignupField};
 use crate::ui::{
     app::App,
     form::view::{FormKind, LoginField},
     menu::view::MenuState,
     view::View,
 };
+
+// ========================================
+// Form: Log In
+// ========================================
 
 pub fn handle_login_key(app: &mut App, key: KeyEvent) {
     // Login form input username then password then submit
@@ -21,8 +25,8 @@ pub fn handle_login_key(app: &mut App, key: KeyEvent) {
         };
         let return_menu = form.return_menu.clone();
         let error = &mut form.error;
-        let login = match &mut form.kind {
-            FormKind::Login(login) => login,
+        let state = match &mut form.kind {
+            FormKind::Login(state) => state,
             _ => return,
         };
 
@@ -32,43 +36,43 @@ pub fn handle_login_key(app: &mut App, key: KeyEvent) {
             }
             KeyCode::Enter => {
                 *error = None;
-                match login.active {
+                match state.active {
                     LoginField::Username => {
-                        if login.username.trim().is_empty() {
+                        if state.username.trim().is_empty() {
                             *error = Some("Username required.".to_string());
                         } else {
-                            login.active = LoginField::Password;
+                            state.active = LoginField::Password;
                         }
                     }
                     LoginField::Password => {
-                        let username = login.username.trim();
+                        let username = state.username.trim();
                         if username.is_empty() {
                             *error = Some("Username required.".to_string());
-                            login.active = LoginField::Username;
-                        } else if login.password_is_empty() {
+                            state.active = LoginField::Username;
+                        } else if state.password_is_empty() {
                             *error = Some("Password required.".to_string());
                         } else {
                             action = LoginAction::Submit {
                                 username: username.to_string(),
-                                password: login.take_password(),
+                                password: state.take_password(),
                             };
                         }
                     }
                 }
             }
-            KeyCode::Backspace => match login.active {
+            KeyCode::Backspace => match state.active {
                 LoginField::Username => {
-                    login.username.pop();
+                    state.username.pop();
                 }
                 LoginField::Password => {
-                    login.pop_password_char();
+                    state.pop_password_char();
                 }
             },
             KeyCode::Char(ch) => {
                 if !key.modifiers.contains(KeyModifiers::CONTROL) {
-                    match login.active {
-                        LoginField::Username => login.username.push(ch),
-                        LoginField::Password => login.push_password_char(ch),
+                    match state.active {
+                        LoginField::Username => state.username.push(ch),
+                        LoginField::Password => state.push_password_char(ch),
                     }
                 }
             }
@@ -91,9 +95,9 @@ pub fn handle_login_key(app: &mut App, key: KeyEvent) {
                 Err(err) => {
                     if let View::Form(form) = &mut app.view {
                         form.error = Some(err.to_string());
-                        if let FormKind::Login(login) = &mut form.kind {
-                            login.clear_password();
-                            login.active = LoginField::Username;
+                        if let FormKind::Login(state) = &mut form.kind {
+                            state.clear_password();
+                            state.active = LoginField::Username;
                         }
                     }
                 }
@@ -111,6 +115,10 @@ enum LoginAction {
     },
 }
 
+// ========================================
+// Form: Sign up
+// ========================================
+
 pub fn handle_signup_key(app: &mut App, key: KeyEvent) {
     // Signup form input username then password then confirm password then submit
     let mut action = SignupAction::None;
@@ -122,8 +130,8 @@ pub fn handle_signup_key(app: &mut App, key: KeyEvent) {
         };
         let return_menu = form.return_menu.clone();
         let error = &mut form.error;
-        let signup = match &mut form.kind {
-            FormKind::Signup(signup) => signup,
+        let state = match &mut form.kind {
+            FormKind::Signup(state) => state,
             _ => return,
         };
 
@@ -133,54 +141,54 @@ pub fn handle_signup_key(app: &mut App, key: KeyEvent) {
             }
             KeyCode::Enter => {
                 *error = None;
-                match signup.active {
+                match state.active {
                     SignupField::Username => {
-                        if signup.username.trim().is_empty() {
+                        if state.username.trim().is_empty() {
                             *error = Some("Username required.".to_string());
                         } else {
-                            signup.active = SignupField::Password;
+                            state.active = SignupField::Password;
                         }
                     }
                     SignupField::Password => {
-                        if signup.password_is_empty() {
+                        if state.password_is_empty() {
                             *error = Some("Password required.".to_string());
                         } else {
-                            signup.active = SignupField::ConfirmPassword;
+                            state.active = SignupField::ConfirmPassword;
                         }
                     }
                     SignupField::ConfirmPassword => {
-                        if signup.confirm_is_empty() {
+                        if state.confirm_is_empty() {
                             *error = Some("Confirm password required.".to_string());
-                        } else if !signup.passwords_match() {
+                        } else if !state.passwords_match() {
                             *error = Some("Passwords do not match.".to_string());
-                            signup.clear_passwords();
-                            signup.active = SignupField::Password;
+                            state.clear_passwords();
+                            state.active = SignupField::Password;
                         } else {
                             action = SignupAction::Submit {
-                                username: signup.username.trim().to_string(),
-                                password: signup.take_password(),
+                                username: state.username.trim().to_string(),
+                                password: state.take_password(),
                             };
                         }
                     }
                 }
             }
-            KeyCode::Backspace => match signup.active {
+            KeyCode::Backspace => match state.active {
                 SignupField::Username => {
-                    signup.username.pop();
+                    state.username.pop();
                 }
                 SignupField::Password => {
-                    signup.pop_password_char();
+                    state.pop_password_char();
                 }
                 SignupField::ConfirmPassword => {
-                    signup.pop_confirm_char();
+                    state.pop_confirm_char();
                 }
             },
             KeyCode::Char(ch) => {
                 if !key.modifiers.contains(KeyModifiers::CONTROL) {
-                    match signup.active {
-                        SignupField::Username => signup.username.push(ch),
-                        SignupField::Password => signup.push_password_char(ch),
-                        SignupField::ConfirmPassword => signup.push_confirm_char(ch),
+                    match state.active {
+                        SignupField::Username => state.username.push(ch),
+                        SignupField::Password => state.push_password_char(ch),
+                        SignupField::ConfirmPassword => state.push_confirm_char(ch),
                     }
                 }
             }
@@ -203,9 +211,9 @@ pub fn handle_signup_key(app: &mut App, key: KeyEvent) {
                 Err(err) => {
                     if let View::Form(form) = &mut app.view {
                         form.error = Some(err.to_string());
-                        if let FormKind::Signup(signup) = &mut form.kind {
-                            signup.clear_passwords();
-                            signup.active = SignupField::Username;
+                        if let FormKind::Signup(state) = &mut form.kind {
+                            state.clear_passwords();
+                            state.active = SignupField::Username;
                         }
                     }
                 }
@@ -221,4 +229,93 @@ enum SignupAction {
         username: String,
         password: SecretSlice<u8>,
     },
+}
+
+// ========================================
+// Form: Group create
+// ========================================
+
+pub fn handle_groupcreate_key(app: &mut App, key: KeyEvent) {
+    // Signup form input username then password then confirm password then submit
+    let mut action = GroupCreateAction::None;
+
+    {
+        let form = match &mut app.view {
+            View::Form(form) => form,
+            _ => return,
+        };
+        let return_menu = form.return_menu.clone();
+        let error = &mut form.error;
+        let state = match &mut form.kind {
+            FormKind::GroupCreate(state) => state,
+            _ => return,
+        };
+
+        match key.code {
+            KeyCode::Esc => {
+                action = GroupCreateAction::Back(return_menu);
+            }
+            KeyCode::Enter => {
+                *error = None;
+                match state.active {
+                    GroupCreateField::Groupname => {
+                        if state.groupname.trim().is_empty() {
+                            *error = Some("Group name required.".to_string());
+                        } else {
+                            // TODO
+                            //state.active = GroupCreateField::Password;
+                        }
+                    }
+                }
+            }
+            KeyCode::Backspace => match state.active {
+                GroupCreateField::Groupname => {
+                    state.groupname.pop();
+                }
+            },
+            KeyCode::Char(ch) => {
+                if !key.modifiers.contains(KeyModifiers::CONTROL) {
+                    match state.active {
+                        GroupCreateField::Groupname => state.groupname.push(ch),
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    match action {
+        GroupCreateAction::None => {}
+        GroupCreateAction::Back(menu) => {
+            app.view = View::Menu(menu);
+        }
+        GroupCreateAction::Submit { groupname } => {
+
+            // TODO logique métier
+            /*
+            match core::auth::perform_signup(&username, &password) {
+                Ok(_) => {
+                    app.view = View::Menu(MenuState::logged_out());
+                    // TODO : Afficher message de confirmation de création
+                    // Sur le menu de retour (logged_out()) à la place du "status" en footer
+                }
+                Err(err) => {
+                    if let View::Form(form) = &mut app.view {
+                        form.error = Some(err.to_string());
+                        if let FormKind::Signup(signup) = &mut form.kind {
+                            signup.clear_passwords();
+                            signup.active = SignupField::Username;
+                        }
+                    }
+                }
+            }
+             */
+        }
+    }
+}
+
+enum GroupCreateAction {
+    None,
+    Back(MenuState),
+    Submit { groupname: String },
 }

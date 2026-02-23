@@ -143,6 +143,7 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         View::Form(form) => match &form.kind {
             FormKind::Login(_) => form_driver::handle_login_key,
             FormKind::Signup(_) => form_driver::handle_signup_key,
+            FormKind::GroupCreate(_) => form_driver::handle_groupcreate_key,
         },
         View::Info(_) => info_driver::handle_info_key,
         View::Chat(_) => chat_driver::handle_chat_key,

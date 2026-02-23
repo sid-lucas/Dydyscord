@@ -14,6 +14,9 @@ pub fn ui(f: &mut Frame, app: &App) {
         View::Form(form) => match &form.kind {
             FormKind::Login(login) => form_draw::login_form(f, form, login),
             FormKind::Signup(signup) => form_draw::signup_form(f, form, signup),
+            FormKind::GroupCreate(groupcreate) => {
+                form_draw::group_create_form(f, form, groupcreate)
+            }
         },
         View::Info(info) => info_draw::info(f, info),
         View::Chat(chat) => chat_draw::chat(f, chat, app.session.is_some()),

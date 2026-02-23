@@ -80,7 +80,10 @@ impl App {
                 MenuEntry::login("Log In"),
                 MenuEntry::quit("Quit"),
             ],
-            MenuPageKind::LoggedIn => vec![MenuEntry::logout("Logout")],
+            MenuPageKind::LoggedIn => vec![
+                MenuEntry::group_create("Create group"),
+                MenuEntry::logout("Logout"),
+            ],
         }
     }
 
@@ -135,6 +138,15 @@ impl App {
             }
             MenuAction::Logout => {
                 self.logout();
+            }
+            MenuAction::GroupCreate => {
+                // Get the current menu to be able to get back to it : return_menu
+                let return_menu = match &self.view {
+                    View::Menu(menu) => menu.clone(),
+                    _ => MenuState::logged_out(),
+                };
+                // Open the login form
+                self.view = View::Form(FormState::group_create(return_menu));
             }
         }
     }
