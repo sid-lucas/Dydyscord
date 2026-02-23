@@ -12,8 +12,10 @@ use ratatui::{Terminal, backend::CrosstermBackend};
 
 use crate::ui::{
     app::App,
+    chat::driver as chat_driver,
     draw,
     form::view::FormKind,
+    info::driver as info_driver,
     menu::view::{MenuPageKind, MenuState},
     view::View,
 };
@@ -142,14 +144,10 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
             FormKind::Login(_) => form_driver::handle_login_key,
             FormKind::Signup(_) => form_driver::handle_signup_key,
         },
-        View::Info(_) => handle_info_key,
-        View::Chat(_) => handle_chat_key,
+        View::Info(_) => info_driver::handle_info_key,
+        View::Chat(_) => chat_driver::handle_chat_key,
     };
     handler(app, key);
 
     app.should_quit
 }
-
-fn handle_info_key(_app: &mut App, _key: KeyEvent) {}
-
-fn handle_chat_key(_app: &mut App, _key: KeyEvent) {}
