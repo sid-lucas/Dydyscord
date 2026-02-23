@@ -6,7 +6,8 @@ use crate::ui::form::view::SignupField;
 use crate::ui::{
     app::App,
     form::view::{FormKind, LoginField},
-    view::{MenuState, View},
+    menu::view::MenuState,
+    view::View,
 };
 
 pub fn handle_login_key(app: &mut App, key: KeyEvent) {

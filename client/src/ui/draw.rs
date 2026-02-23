@@ -1,99 +1,28 @@
 use crate::ui::{
     app::App,
-    form::{draw, view::FormKind},
-    view::{Chat, MenuPageKind, MenuState, View},
+    form::{draw as form_draw, view::FormKind},
+    menu::draw as menu_draw,
+    view::{Chat, View},
 };
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
 pub fn ui(f: &mut Frame, app: &App) {
     match &app.view {
-        View::Menu(menu) => draw_menu(f, app, menu),
+        View::Menu(menu) => menu_draw::menu(f, app, menu),
         View::Form(form) => match &form.kind {
-            FormKind::Login(login) => draw::login_form(f, form, login),
-            FormKind::Signup(signup) => draw::signup_form(f, form, signup),
+            FormKind::Login(login) => form_draw::login_form(f, form, login),
+            FormKind::Signup(signup) => form_draw::signup_form(f, form, signup),
         },
         View::Info(_) => draw_error(f, "Info view not implemented yet."),
         View::Chat(_) => draw_error(f, "Chat view not implemented yet."),
     }
-}
-
-fn draw_menu(f: &mut Frame, app: &App, menu: &MenuState) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(3),
-            Constraint::Length(1),
-        ])
-        .split(f.size());
-
-    let nav_hint = if app.session.is_some() {
-        if menu.stack.len() > 1 {
-            "Enter: select | Esc/Ctrl+C: back"
-        } else {
-            "Enter: select | Esc/Ctrl+C: logout"
-        }
-    } else {
-        "Enter: select | Esc/Ctrl+C: quit"
-    };
-
-    // Header shows the navigation path + user + shortcuts
-    let path = menu_path(menu);
-    let mut header_spans = vec![
-        Span::styled(path, Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("   "),
-    ];
-
-    if let Some(session) = app.session.as_ref() {
-        header_spans.push(Span::raw("User: "));
-        header_spans.push(Span::styled(
-            session.username(),
-            Style::default().add_modifier(Modifier::BOLD),
-        ));
-        header_spans.push(Span::raw("   "));
-    }
-
-    header_spans.push(Span::raw(nav_hint));
-
-    let header = Line::from(header_spans);
-    f.render_widget(Paragraph::new(Text::from(header)), chunks[0]);
-
-    let entries = app.menu_entries(menu.current().kind);
-    let items: Vec<ListItem> = entries
-        .iter()
-        .map(|entry| ListItem::new(entry.label.clone()))
-        .collect();
-
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .title(menu.current().kind.title())
-                .borders(Borders::ALL),
-        )
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol("▸ ");
-
-    let mut state = ListState::default();
-    if !entries.is_empty() {
-        let selected = menu.current().selected.min(entries.len().saturating_sub(1));
-        state.select(Some(selected));
-    }
-
-    f.render_stateful_widget(list, chunks[1], &mut state);
-
-    let status_line = Line::from(vec![
-        Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(app.menu_status()),
-    ]);
-    let status = Paragraph::new(Text::from(status_line));
-    f.render_widget(status, chunks[2]);
 }
 
 fn draw_error(f: &mut Frame, message: &str) {
@@ -102,14 +31,6 @@ fn draw_error(f: &mut Frame, message: &str) {
         .block(block)
         .wrap(Wrap { trim: true });
     f.render_widget(paragraph, f.size());
-}
-
-fn menu_path(menu: &MenuState) -> String {
-    let mut parts = Vec::new();
-    for frame in &menu.stack {
-        parts.push(frame.kind.title());
-    }
-    parts.join(" > ")
 }
 
 fn draw_chat(f: &mut Frame, chat: &Chat, authenticated: bool) {
@@ -152,10 +73,6 @@ fn draw_header(f: &mut Frame, area: Rect, chat: &Chat, authenticated: bool) {
 
     let header = Paragraph::new(Text::from(title));
     f.render_widget(header, area);
-}
-
-fn is_guest_root(menu: &MenuState) -> bool {
-    menu.stack.len() == 1 && matches!(menu.current().kind, MenuPageKind::LoggedOut)
 }
 
 fn draw_middle(f: &mut Frame, area: Rect, chat: &Chat) {

@@ -14,10 +14,11 @@ use crate::ui::{
     app::App,
     draw,
     form::view::FormKind,
-    view::{MenuPageKind, MenuState, View},
+    menu::view::{MenuPageKind, MenuState},
+    view::View,
 };
 
-use crate::ui::form::driver;
+use crate::ui::{form::driver as form_driver, menu::driver as menu_driver};
 
 pub fn run(app: App) -> io::Result<()> {
     // Start terminal in raw mode and alternate screen then run the UI loop
@@ -136,10 +137,10 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     }
 
     let handler: fn(&mut App, KeyEvent) = match &app.view {
-        View::Menu(_) => handle_menu_key,
+        View::Menu(_) => menu_driver::handle_menu_key,
         View::Form(form) => match &form.kind {
-            FormKind::Login(_) => driver::handle_login_key,
-            FormKind::Signup(_) => driver::handle_signup_key,
+            FormKind::Login(_) => form_driver::handle_login_key,
+            FormKind::Signup(_) => form_driver::handle_signup_key,
         },
         View::Info(_) => handle_info_key,
         View::Chat(_) => handle_chat_key,
@@ -147,41 +148,6 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     handler(app, key);
 
     app.should_quit
-}
-
-fn handle_menu_key(app: &mut App, key: KeyEvent) {
-    // Menu input move selection enter or go back
-    let kind = match &app.view {
-        View::Menu(menu) => menu.current().kind,
-        _ => return,
-    };
-    let entries = app.menu_entries(kind);
-    let mut activate = false;
-
-    {
-        let menu = match &mut app.view {
-            View::Menu(menu) => menu,
-            _ => return,
-        };
-        menu.current_mut().clamp(entries.len());
-
-        match key.code {
-            KeyCode::Up => menu.current_mut().move_selection(-1, entries.len()),
-            KeyCode::Down => menu.current_mut().move_selection(1, entries.len()),
-            KeyCode::PageUp => menu.current_mut().move_selection(-5, entries.len()),
-            KeyCode::PageDown => menu.current_mut().move_selection(5, entries.len()),
-            KeyCode::Enter => activate = true,
-            KeyCode::Esc | KeyCode::Backspace => {
-                // Back to previous menu at root it stays put
-                menu.pop();
-            }
-            _ => {}
-        }
-    }
-
-    if activate {
-        app.activate_menu_selection();
-    }
 }
 
 fn handle_info_key(_app: &mut App, _key: KeyEvent) {}
