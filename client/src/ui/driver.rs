@@ -384,13 +384,12 @@ fn handle_signup_key(app: &mut App, key: KeyEvent) {
             match core::auth::perform_signup(&username, &password) {
                 Ok(_) => {
                     // TODO REMOVE :
-                    //app.session = Some(session);
-                    //app.view = View::Menu(MenuState::logged_in());
-                    // TODO: PROCEED LE SIGNUP
+                    app.view = View::Menu(MenuState::logged_out());
                 }
                 Err(err) => {
                     // TODO : Handle signup error
-                    // Regarder comment on a fait sur handle_login_key()
+                    Ok(_) => state.set_action_msg("Registration successful!"),
+                    state.set_action_msg(format!("Registration failed: {e}")),
                 }
             }
         }

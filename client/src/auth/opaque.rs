@@ -28,7 +28,7 @@ impl CipherSuite for OpaqueCipherSuite {
 pub struct LoginResult {
     pub username: String,
     pub id: Uuid,
-    pub export_key: SecretSlice<u8>, // TODO REVIEW with SecretSlice<u8>
+    pub export_key: SecretSlice<u8>,
     pub session_key: SecretSlice<u8>,
 }
 
