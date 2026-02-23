@@ -267,18 +267,9 @@ fn handle_login_key(app: &mut App, key: KeyEvent) {
                     app.view = View::Menu(MenuState::logged_in());
                 }
                 Err(err) => {
-                    // Keep friendly errors for invalid credentials fallback to raw error text
-                    let message = match err {
-                        AppError::Transport(TransportError::LoginFailed)
-                        | AppError::Transport(TransportError::Unauthorized) => {
-                            "Username or password is incorrect.".to_string()
-                        }
-                        _ => err.to_string(),
-                    };
                     if let View::Form(form) = &mut app.view {
-                        form.error = Some(message);
+                        form.error = Some(err.to_string());
                         if let FormKind::Login(login) = &mut form.kind {
-                            // Security and UX clear password and reset focus to the first field
                             login.clear_password();
                             login.active = LoginField::Username;
                         }
@@ -383,13 +374,18 @@ fn handle_signup_key(app: &mut App, key: KeyEvent) {
         SignupAction::Submit { username, password } => {
             match core::auth::perform_signup(&username, &password) {
                 Ok(_) => {
-                    // TODO REMOVE :
                     app.view = View::Menu(MenuState::logged_out());
+                    // TODO : Afficher message de confirmation de création
+                    // Sur le menu de retour (logged_out()) à la place du "status" en footer
                 }
                 Err(err) => {
-                    // TODO : Handle signup error
-                    Ok(_) => state.set_action_msg("Registration successful!"),
-                    state.set_action_msg(format!("Registration failed: {e}")),
+                    if let View::Form(form) = &mut app.view {
+                        form.error = Some(err.to_string());
+                        if let FormKind::Signup(signup) = &mut form.kind {
+                            signup.clear_passwords();
+                            signup.active = SignupField::Username;
+                        }
+                    }
                 }
             }
         }
