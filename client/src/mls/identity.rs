@@ -122,6 +122,7 @@ pub fn init_openmls(
     Ok(())
 }
 
+// TODO Change to accept list of user and retrieve list of keypackages
 pub fn init_group(
     db_key: &SecretSlice<u8>,
     user_id: &str,

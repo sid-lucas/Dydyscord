@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use secrecy::SecretSlice;
 
 use crate::core;
-use crate::ui::form::view::{GroupCreateField, SignupField};
+use crate::ui::form::view::{CreateGroupFormStep, SignupField};
 use crate::ui::{
     app::App,
     form::view::{FormKind, LoginField},
@@ -236,7 +236,7 @@ enum SignupAction {
 // ========================================
 
 pub fn handle_groupcreate_key(app: &mut App, key: KeyEvent) {
-    // Signup form input username then password then confirm password then submit
+    // Group create flow: name then members selection then submit
     let mut action = GroupCreateAction::None;
 
     {
@@ -255,32 +255,51 @@ pub fn handle_groupcreate_key(app: &mut App, key: KeyEvent) {
             KeyCode::Esc => {
                 action = GroupCreateAction::Back(return_menu);
             }
-            KeyCode::Enter => {
-                *error = None;
-                match state.active {
-                    GroupCreateField::Groupname => {
-                        if state.groupname.trim().is_empty() {
+            _ => match state.step {
+                CreateGroupFormStep::Info => match key.code {
+                    KeyCode::Enter => {
+                        *error = None;
+                        if state.name.trim().is_empty() {
                             *error = Some("Group name required.".to_string());
                         } else {
-                            // TODO
-                            //state.active = GroupCreateField::Password;
+                            state.step = CreateGroupFormStep::Members;
                         }
                     }
-                }
-            }
-            KeyCode::Backspace => match state.active {
-                GroupCreateField::Groupname => {
-                    state.groupname.pop();
-                }
-            },
-            KeyCode::Char(ch) => {
-                if !key.modifiers.contains(KeyModifiers::CONTROL) {
-                    match state.active {
-                        GroupCreateField::Groupname => state.groupname.push(ch),
+                    KeyCode::Backspace => {
+                        state.name.pop();
                     }
-                }
-            }
-            _ => {}
+                    KeyCode::Char(ch) => {
+                        if !key.modifiers.contains(KeyModifiers::CONTROL) {
+                            state.name.push(ch);
+                        }
+                    }
+                    _ => {}
+                },
+                CreateGroupFormStep::Members => match key.code {
+                    KeyCode::Up => {
+                        if state.cursor > 0 {
+                            state.cursor -= 1;
+                        }
+                    }
+                    KeyCode::Down => {
+                        if state.cursor + 1 < state.friends.len() {
+                            state.cursor += 1;
+                        }
+                    }
+                    KeyCode::Char(' ') => {
+                        if let Some(friend) = state.friends.get_mut(state.cursor) {
+                            friend.selected = !friend.selected;
+                        }
+                    }
+                    KeyCode::Enter => {
+                        action = GroupCreateAction::Submit {
+                            groupname: state.name.trim().to_string(),
+                            invited: state.selected_usernames(),
+                        };
+                    }
+                    _ => {}
+                },
+            },
         }
     }
 
@@ -289,11 +308,11 @@ pub fn handle_groupcreate_key(app: &mut App, key: KeyEvent) {
         GroupCreateAction::Back(menu) => {
             app.view = View::Menu(menu);
         }
-        GroupCreateAction::Submit { groupname } => {
+        GroupCreateAction::Submit { groupname, invited } => {
 
             // TODO logique métier
             /*
-            match core::auth::perform_signup(&username, &password) {
+            match core::groups::create_group(&groupname, &invited) {
                 Ok(_) => {
                     app.view = View::Menu(MenuState::logged_out());
                     // TODO : Afficher message de confirmation de création
@@ -317,5 +336,8 @@ pub fn handle_groupcreate_key(app: &mut App, key: KeyEvent) {
 enum GroupCreateAction {
     None,
     Back(MenuState),
-    Submit { groupname: String },
+    Submit {
+        groupname: String,
+        invited: Vec<String>,
+    },
 }

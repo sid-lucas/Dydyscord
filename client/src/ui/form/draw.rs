@@ -3,12 +3,12 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
 use crate::ui::form::view::{
-    FormState, GroupCreateField, GroupCreateFormState, LoginField, LoginFormState, SignupField,
+    CreateGroupFormStep, FormState, GroupCreateFormState, LoginField, LoginFormState, SignupField,
     SignupFormState,
 };
 
@@ -179,39 +179,58 @@ pub fn group_create_form(f: &mut Frame, form: &FormState, state: &GroupCreateFor
     ]);
     f.render_widget(Paragraph::new(Text::from(header)), chunks[0]);
 
-    let groupname_label = "Group name: ";
+    match state.step {
+        CreateGroupFormStep::Info => {
+            let groupname_label = "Group name: ";
+            let groupname_style = Style::default().add_modifier(Modifier::BOLD);
 
-    let groupname_style = if state.active == GroupCreateField::Groupname {
-        Style::default().add_modifier(Modifier::BOLD)
-    } else {
-        Style::default()
-    };
+            let mut lines = Vec::new();
+            lines.push(Line::from(vec![
+                Span::styled(groupname_label, groupname_style),
+                Span::raw(state.name.clone()),
+            ]));
+            if let Some(error) = &form.error {
+                lines.push(Line::from(vec![
+                    Span::styled("Error: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::raw(error.clone()),
+                ]));
+            }
 
-    let mut lines = Vec::new();
-    lines.push(Line::from(vec![
-        Span::styled(groupname_label, groupname_style),
-        Span::raw(state.groupname.clone()),
-    ]));
-    if let Some(error) = &form.error {
-        lines.push(Line::from(vec![
-            Span::styled("Error: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(error.clone()),
-        ]));
+            let block = Block::default().title("Info").borders(Borders::ALL);
+            let paragraph = Paragraph::new(Text::from(lines))
+                .block(block)
+                .wrap(Wrap { trim: true });
+            f.render_widget(paragraph, chunks[1]);
+
+            let x = chunks[1].x
+                + 1
+                + UnicodeWidthStr::width(groupname_label) as u16
+                + UnicodeWidthStr::width(state.name.as_str()) as u16;
+            let y = chunks[1].y + 1;
+            f.set_cursor(x, y);
+        }
+        CreateGroupFormStep::Members => {
+            let items: Vec<ListItem> = state
+                .friends
+                .iter()
+                .map(|friend| {
+                    let mark = if friend.selected { "[x]" } else { "[ ]" };
+                    ListItem::new(format!("{} {}", mark, friend.username))
+                })
+                .collect();
+
+            let mut list_state = ListState::default();
+            if !items.is_empty() {
+                let selected = state.cursor.min(items.len().saturating_sub(1));
+                list_state.select(Some(selected));
+            }
+
+            let list = List::new(items)
+                .block(Block::default().title("Invite friends").borders(Borders::ALL))
+                .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+                .highlight_symbol("▸ ");
+
+            f.render_stateful_widget(list, chunks[1], &mut list_state);
+        }
     }
-
-    let block = Block::default().title("Credentials").borders(Borders::ALL);
-    let paragraph = Paragraph::new(Text::from(lines))
-        .block(block)
-        .wrap(Wrap { trim: true });
-    f.render_widget(paragraph, chunks[1]);
-
-    let (label, value_width, row) = match state.active {
-        GroupCreateField::Groupname => (groupname_label, state.groupname.as_str(), 0u16),
-    };
-    let x = chunks[1].x
-        + 1
-        + UnicodeWidthStr::width(label) as u16
-        + UnicodeWidthStr::width(value_width) as u16;
-    let y = chunks[1].y + 1 + row;
-    f.set_cursor(x, y);
 }

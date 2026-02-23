@@ -34,10 +34,18 @@ impl FormState {
     }
 
     pub fn group_create(return_menu: MenuState) -> Self {
+        // TODO : PLACEHOLDER LISTE D'AMIS FIXE, CHANGER APRES IMPLEMENTATION "ADD FRIEND"
+        let friends = vec![
+            "alice".to_string(),
+            "bob".to_string(),
+            "carl".to_string(),
+            "dydy".to_string(),
+        ];
+
         Self {
             return_menu,
             error: None,
-            kind: FormKind::GroupCreate(GroupCreateFormState::new()),
+            kind: FormKind::GroupCreate(GroupCreateFormState::new(friends)),
         }
     }
 }
@@ -211,8 +219,19 @@ impl SignupFormState {
 }
 
 // ========================================
-// Form: Log In
+// Form: Group create
 // ========================================
+// TODO Revoir le naming des struct/enum...
+
+pub enum CreateGroupFormStep {
+    Info,
+    Members,
+}
+
+pub struct FriendEntry {
+    pub username: String,
+    pub selected: bool,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GroupCreateField {
@@ -220,15 +239,35 @@ pub enum GroupCreateField {
 }
 
 pub struct GroupCreateFormState {
-    pub groupname: String,
-    pub active: GroupCreateField,
+    pub step: CreateGroupFormStep,
+    pub name: String,
+    pub cursor: usize,
+    pub friends: Vec<FriendEntry>,
 }
 
 impl GroupCreateFormState {
-    pub fn new() -> Self {
+    pub fn new(friends: Vec<String>) -> Self {
+        let friends = friends
+            .into_iter()
+            .map(|username| FriendEntry {
+                username,
+                selected: false,
+            })
+            .collect();
+
         Self {
-            groupname: String::new(),
-            active: GroupCreateField::Groupname,
+            step: CreateGroupFormStep::Info,
+            name: String::new(),
+            cursor: 0,
+            friends,
         }
+    }
+
+    pub fn selected_usernames(&self) -> Vec<String> {
+        self.friends
+            .iter()
+            .filter(|f| f.selected)
+            .map(|f| f.username.clone())
+            .collect()
     }
 }
