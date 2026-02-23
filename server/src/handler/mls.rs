@@ -6,7 +6,6 @@ use common::{WelcomeFetchResponse, WelcomeStoreRequest};
 use openmls::prelude::{KeyPackageIn, ProtocolVersion, tls_codec::DeserializeBytes};
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_traits::OpenMlsProvider;
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::config::server::ServerState;
@@ -48,8 +47,18 @@ pub async fn get_keypackage_from_username(
     State(state): State<ServerState>,
     Json(payload): Json<UserKeyPackageRequest>,
 ) -> Result<(StatusCode, Json<Vec<DeviceKeyPackage>>), StatusCode> {
-    // Retrieve username and compute the corresponding login_lookup
-    let login_lookup = handler::login_lookup(&state.pepper(), &payload.username);
+    if payload.invited.is_empty() {
+        return Ok((StatusCode::OK, Json(vec![])));
+    }
+
+    // Retrieve usernames and compute the corresponding login_lookup list
+    let login_lookups: Vec<String> = payload
+        .invited
+        .iter()
+        .map(|username| handler::login_lookup(&state.pepper(), username))
+        .collect();
+
+    // TODO : REPRENDRE ICI : Faire que ca recup un keypackage pour chaque login_lookups
 
     let out = sqlx::query_as!(
         DeviceKeyPackage,
@@ -66,7 +75,7 @@ pub async fn get_keypackage_from_username(
         FROM users u
         JOIN devices d ON d.user_id = u.id
         JOIN key_packages kp ON kp.device_id = d.id
-        WHERE u.login_lookup = $1
+        WHERE u.login_lookup = ANY($1)
         ),
         to_delete AS (
         SELECT id, device_id, key_package
@@ -78,7 +87,7 @@ pub async fn get_keypackage_from_username(
         WHERE kp.id = td.id
         RETURNING td.device_id, td.key_package
         "#,
-        login_lookup
+        &login_lookups
     )
     .fetch_all(&state.pool())
     .await
