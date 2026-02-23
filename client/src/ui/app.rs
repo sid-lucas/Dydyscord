@@ -1,8 +1,8 @@
 use std::time::{Duration, Instant};
 
-use crate::{auth::session::Session, config::constant};
+use crate::{auth::session::Session, config::constant, ui::form::view::FormState};
 
-use super::view::{FormState, MenuAction, MenuEntry, MenuPageKind, MenuState, View};
+use super::view::{MenuAction, MenuEntry, MenuPageKind, MenuState, View};
 
 const STATUS_ROTATE_EVERY: Duration = Duration::from_secs(1);
 const STATUS_MESSAGES: &[&str] = &[

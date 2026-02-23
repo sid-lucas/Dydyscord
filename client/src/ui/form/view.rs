@@ -1,6 +1,6 @@
 use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretSlice};
 
-use super::menu::MenuState;
+use crate::ui::view::MenuState;
 
 pub struct FormState {
     pub return_menu: MenuState,
