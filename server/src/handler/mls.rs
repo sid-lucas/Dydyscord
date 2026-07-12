@@ -52,7 +52,7 @@ pub async fn get_keypackage_from_username(
     }
 
     // Retrieve usernames and compute the corresponding login_lookup list
-    let login_lookups: Vec<String> = payload
+    let login_lookups: Vec<Vec<u8>> = payload
         .invited
         .iter()
         .map(|username| handler::login_lookup(&state.pepper(), username))

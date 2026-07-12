@@ -60,6 +60,7 @@ pub struct WelcomeFetchResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UserKeyPackageRequest {
     pub username: String,
+    pub invited: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
